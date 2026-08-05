@@ -18,7 +18,9 @@ npm install
 npx playwright install chromium   # optional — only for JS-heavy pages
 ```
 
-Requires Node 20+ (`AbortSignal.any`, `Headers.getSetCookie`).
+Requires **Node 22+**. The floor is set by jsdom, which the deterministic
+extraction sandbox runs on; Drazta's own code needs `AbortSignal.any` and
+`Headers.getSetCookie`, which arrive earlier. CI covers Node 22 and 24.
 
 ## Quick start
 

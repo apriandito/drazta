@@ -11,14 +11,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 20 is the floor the code actually requires (AbortSignal.any,
-        # Headers.getSetCookie); 22 is what development happens on.
-        node: [20, 22]
+        # Node 22 is the real floor, and it is set by jsdom (used by the
+        # deterministic-extraction sandbox), whose engines are
+        # ^22.22.2 || ^24.15.0 || >=26.0.0. Node 20 fails at import time:
+        # jsdom's bundled undici calls webidl.util.markAsUncloneable, which
+        # that line does not provide. Both entries here are tested LTS lines.
+        node: [22, 24]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
           cache: npm
