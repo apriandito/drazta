@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+  Drazta — draṣṭṛ, "the seer".
+
+  Two rules hold this design together:
+
+  1. HUE IS RESERVED FOR PROVENANCE. Buttons, links, borders and chrome are
+     achromatic ink. The only saturated colour on the page is a claim about
+     where a value came from — teal for what the page itself stated, violet
+     for what a model inferred, amber for what should be distrusted. If it is
+     coloured, it means something.
+
+  2. THE SHIROREKHA. Devanagari binds the letters of a word under one
+     horizontal head-line. Every panel here is bound the same way: a solid
+     rule across the top, with the label hanging beneath it. It is the one
+     ornament, and it comes from the name.
+*/
+
+:root {
+  --ground: #e7ebec;
+  --surface: #ffffff;
+  --surface-sunk: #f1f4f4;
+  --ink: #0f1719;
+  --ink-2: #4a5a5e;
+  --ink-3: #79888c;
+  --rule: #c8d1d3;
+  --rule-soft: #dde3e4;
+
+  /* provenance */
+  --seen: #0b6e63;
+  --seen-bg: #dbeeeb;
+  --inferred: #563aba;
+  --inferred-bg: #e6e0f7;
+  --degraded: #8f4e08;
+  --degraded-bg: #f6e6cd;
+  --absent: #79888c;
+  --absent-bg: #e9edee;
+}
+
+[data-theme="dark"] {
+  --ground: #0d1214;
+  --surface: #151d20;
+  --surface-sunk: #101719;
+  --ink: #e4ebec;
+  --ink-2: #a2b1b4;
+  --ink-3: #6f8286;
+  --rule: #2b3639;
+  --rule-soft: #212b2e;
+
+  --seen: #4ecdc0;
+  --seen-bg: #0f302d;
+  --inferred: #a78bfa;
+  --inferred-bg: #241c3d;
+  --degraded: #e0a458;
+  --degraded-bg: #382713;
+  --absent: #6f8286;
+  --absent-bg: #1b2427;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-sunk: var(--surface-sunk);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+
+  --color-seen: var(--seen);
+  --color-seen-bg: var(--seen-bg);
+  --color-inferred: var(--inferred);
+  --color-inferred-bg: var(--inferred-bg);
+  --color-degraded: var(--degraded);
+  --color-degraded-bg: var(--degraded-bg);
+  --color-absent: var(--absent);
+  --color-absent-bg: var(--absent-bg);
+
+  --font-display: "Archivo", "Helvetica Neue", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  html {
+    background: var(--ground);
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The seer looks: give it a visible eye. */
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--surface);
+  }
+}
+
+@layer components {
+  /*
+    The shirorekha: the head-line that binds a panel. Solid ink across the
+    top, everything hangs from it.
+  */
+  .bound {
+    border-top: 2px solid var(--ink);
+  }
+
+  .bound-soft {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Eyebrow labels hang from the head-line, the way Devanagari letters do. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+  }
+
+  .display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Text entry. Ink-on-surface, one hairline, no rounding — an instrument. */
+  .input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.5rem 0.625rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    transition: border-color 120ms ease;
+  }
+
+  .input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .input:hover {
+    border-color: var(--ink-3);
+  }
+
+  .input:focus {
+    border-color: var(--ink);
+  }
+
+  /* Markdown / raw output surfaces. */
+  .readout {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
