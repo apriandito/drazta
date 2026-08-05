@@ -31,7 +31,7 @@ export function createMemoryCache(): ExtractorCache {
 }
 
 /** Persists extractors as JSON files under a directory. Survives restarts. */
-export function createFileCache(dir = ".scrapeflow-cache"): ExtractorCache {
+export function createFileCache(dir = ".drazta-cache"): ExtractorCache {
   const path = (key: string) => join(dir, `${key}.json`);
   return {
     async get(key) {

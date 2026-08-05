@@ -79,7 +79,7 @@ async function main() {
 
   // Verify the actual xlsx bytes parse and contain the expected data.
   const out = session.files[0].bytes;
-  const path = "/tmp/scrapeflow-agent-test.xlsx";
+  const path = "/tmp/drazta-agent-test.xlsx";
   await writeFile(path, out);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(await readFile(path));

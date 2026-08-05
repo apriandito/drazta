@@ -21,7 +21,7 @@ const scrapeBody = z.object({
   engine: z.string().optional(),
 });
 
-app.get("/health", (c) => c.json({ ok: true, service: "scrapeflow" }));
+app.get("/health", (c) => c.json({ ok: true, service: "drazta" }));
 
 /** POST /scrape — the core capability. */
 app.post("/scrape", async (c) => {
@@ -105,7 +105,7 @@ app.post("/extract", async (c) => {
 
 const port = Number(process.env.PORT ?? 3000);
 serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`scrapeflow listening on http://localhost:${info.port}`);
+  console.log(`drazta listening on http://localhost:${info.port}`);
 });
 
 export { app };

@@ -1,4 +1,4 @@
-# ScrapeFlow
+# Drazta
 
 A clean, extensible web-scraping + structured-extraction engine, built on a
 **Ports & Adapters** (hexagonal) architecture so it can grow from
@@ -52,7 +52,7 @@ npx playwright install chromium
 ## Use — as a library
 
 ```ts
-import { scrapeUrl, extractStructured, createOpenAIProvider } from "scrapeflow";
+import { scrapeUrl, extractStructured, createOpenAIProvider } from "drazta";
 import { z } from "zod";
 
 const doc = await scrapeUrl("https://example.com", {
@@ -146,7 +146,7 @@ npx tsx scripts/smoke.ts
 ## Phase 3 — discovery & multi-page
 
 ```ts
-import { mapSite, crawl } from "scrapeflow";
+import { mapSite, crawl } from "drazta";
 
 const urls = await mapSite("https://example.com", { limit: 100 }); // sitemap + links
 const { documents } = await crawl("https://example.com/blog", {
@@ -169,7 +169,7 @@ tracking status and results. Inspired by the queue-of-agents model (qm), kept
 in-process with a `JobStore` port you can swap for Postgres/Redis later.
 
 ```ts
-import { JobManager, createDefaultHandlers } from "scrapeflow";
+import { JobManager, createDefaultHandlers } from "drazta";
 
 const mgr = new JobManager({ handlers: createDefaultHandlers(), concurrency: 4 });
 const results = await mgr.submitAndRun([
@@ -196,7 +196,7 @@ OPENAI_API_KEY=... npm run agent -- "berita ekonomi syariah di CNBC, jadikan Exc
 ```
 
 ```ts
-import { runAgent } from "scrapeflow";
+import { runAgent } from "drazta";
 
 const { files, records } = await runAgent({
   task: "collect Islamic-economy news from CNBC Indonesia into an Excel file",
@@ -232,7 +232,7 @@ all emit for SEO** (JSON-LD is near-universal on news sites). Every field record
 its `source` so you can see which layer produced it.
 
 ```ts
-import { scrapeUrl, extractArticle } from "scrapeflow";
+import { scrapeUrl, extractArticle } from "drazta";
 const doc = await scrapeUrl(url, { formats: ["rawHtml"] });
 const a = extractArticle(doc);
 // { title, author, publishedDate, publishedTime, description,
@@ -251,7 +251,7 @@ store's product page to one canonical shape via schema.org `Product` JSON-LD
 (what shops emit for Google Shopping) with Open Graph product-meta fallback:
 
 ```ts
-import { scrapeUrl, extractProduct } from "scrapeflow";
+import { scrapeUrl, extractProduct } from "drazta";
 const doc = await scrapeUrl(url, { formats: ["rawHtml"] });
 const p = extractProduct(doc);
 // { name, brand, price, currency, priceText, availability,
@@ -264,7 +264,7 @@ WooCommerce store: name/price/sku/availability/image all from JSON-LD, one code
 path, no per-site rules.
 
 **On anti-bot sites (e.g. Tokopedia):** hardened marketplaces return `503`/
-challenges to plain HTTP and detect headless browsers. ScrapeFlow's resilience
+challenges to plain HTTP and detect headless browsers. Drazta's resilience
 layer *detects* the block, but getting *through* needs stealth + residential
 proxies (a `FetchEngine` you plug in) — the extractor above still applies once
 you have the HTML.
@@ -276,7 +276,7 @@ it with SQL — join, aggregate, export to CSV/Parquet, no server. DuckDB is an
 optional dependency, loaded lazily.
 
 ```ts
-import { deepExtract, DuckDBDatasetStore } from "scrapeflow";
+import { deepExtract, DuckDBDatasetStore } from "drazta";
 
 const { table } = await deepExtract(sources, { merge: "join", key: "@first" });
 const db = await DuckDBDatasetStore.open("data.duckdb"); // or ":memory:"
@@ -306,7 +306,7 @@ list. `deepExtract` scrapes them concurrently, tidies each table, and merges int
 a single dataset — two modes:
 
 ```ts
-import { deepExtract } from "scrapeflow";
+import { deepExtract } from "drazta";
 
 // UNION — stack rows from paginated pages (same schema), tag the source.
 await deepExtract(pages, { merge: "union", sourceColumn: "page" });
@@ -334,7 +334,7 @@ one pass: it infers a type per column, coerces cells (numbers → `number`, date
 can snake_case headers for SQL/DuckDB.
 
 ```ts
-import { extractTables, largestTable, tidyTable } from "scrapeflow";
+import { extractTables, largestTable, tidyTable } from "drazta";
 
 const t = tidyTable(largestTable(doc)!, { snakeCase: true });
 // t.columns -> [{name:"population", type:"number"}, {name:"date", type:"date"}, ...]

@@ -1,4 +1,4 @@
-/** Public entrypoint. Import from "scrapeflow". */
+/** Public entrypoint. Import from "drazta". */
 
 export type {
   Document,

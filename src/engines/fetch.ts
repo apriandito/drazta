@@ -3,7 +3,7 @@ import type { RawResult, ScrapeOptions } from "../types.js";
 import { safeFetch } from "../lib/safeFetch.js";
 
 const DEFAULT_UA =
-  "Mozilla/5.0 (compatible; ScrapeFlow/0.1; +https://example.invalid/bot)";
+  "Mozilla/5.0 (compatible; Drazta/0.1; +https://example.invalid/bot)";
 
 /**
  * The cheapest engine: a plain HTTP GET, which handles the majority of

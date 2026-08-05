@@ -15,11 +15,11 @@ import { BlockedAddressError, classifyFetchError } from "../core/errors.js";
  *   2. follows redirects MANUALLY, re-checking every hop,
  *   3. carries cookies across those hops, so consent/session redirects work.
  *
- * Set SCRAPEFLOW_ALLOW_PRIVATE_IPS=1 to scrape a local dev server on purpose.
+ * Set DRAZTA_ALLOW_PRIVATE_IPS=1 to scrape a local dev server on purpose.
  */
 
 function allowPrivate(): boolean {
-  return process.env.SCRAPEFLOW_ALLOW_PRIVATE_IPS === "1";
+  return process.env.DRAZTA_ALLOW_PRIVATE_IPS === "1";
 }
 
 /** Parse dotted-quad IPv4 into its 32-bit value, or null if it isn't one. */

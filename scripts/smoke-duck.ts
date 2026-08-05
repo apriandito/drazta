@@ -52,7 +52,7 @@ async function main() {
   ok("ORDER BY on numeric column returns Bali (highest 2024)");
 
   // Export to CSV.
-  const csvPath = "/tmp/scrapeflow-inflasi.csv";
+  const csvPath = "/tmp/drazta-inflasi.csv";
   await store.exportCsv("inflasi", csvPath);
   const csv = await readFile(csvPath, "utf8");
   assert.match(csv, /provinsi,inflasi_2023,inflasi_2024,tanggal/);

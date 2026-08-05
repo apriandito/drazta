@@ -5,7 +5,7 @@ import type { CellType } from "../lib/coerce.js";
  * DuckDB landing store for scraped datasets. DuckDB is an embedded analytical
  * database — no server — so a local file (or :memory:) becomes a queryable data
  * warehouse: land a TidyTable, then run SQL joins/aggregations and export to
- * CSV/Parquet. The native dep is loaded lazily, so the rest of ScrapeFlow works
+ * CSV/Parquet. The native dep is loaded lazily, so the rest of Drazta works
  * without it installed.
  */
 

@@ -6,7 +6,7 @@ import type { OutputFormat, ScrapeOptions } from "./types.js";
 
 /**
  * Minimal CLI:
- *   scrapeflow <url> [--format markdown|json|rawHtml|links|html]
+ *   drazta <url> [--format markdown|json|rawHtml|links|html]
  *                     [--main] [--js] [--engine fetch|playwright]
  *                     [--out file] [--export markdown|json|xlsx]
  */
@@ -32,13 +32,13 @@ async function main() {
   const { url, opts, out, exportFormat } = parseArgs(process.argv.slice(2));
   if (!url) {
     console.error(
-      "usage: scrapeflow <url> [--format markdown|json|rawHtml|links|html] [--main] [--js] [--engine name] [--export markdown|json|xlsx] [--out file]",
+      "usage: drazta <url> [--format markdown|json|rawHtml|links|html] [--main] [--js] [--engine name] [--export markdown|json|xlsx] [--out file]",
     );
     process.exit(1);
   }
 
   const doc = await scrapeUrl(url, opts, (m) =>
-    process.stderr.write(`[scrapeflow] ${m}\n`),
+    process.stderr.write(`[drazta] ${m}\n`),
   );
 
   if (exportFormat) {
@@ -46,7 +46,7 @@ async function main() {
     const result = await sink.write([doc]);
     if (out) {
       await writeFile(out, result as Buffer | string);
-      process.stderr.write(`[scrapeflow] wrote ${out}\n`);
+      process.stderr.write(`[drazta] wrote ${out}\n`);
     } else if (typeof result === "string") {
       process.stdout.write(result + "\n");
     }
@@ -70,13 +70,13 @@ async function main() {
   const output = value ?? "";
   if (out) {
     await writeFile(out, output);
-    process.stderr.write(`[scrapeflow] wrote ${out}\n`);
+    process.stderr.write(`[drazta] wrote ${out}\n`);
   } else {
     process.stdout.write(output + "\n");
   }
 }
 
 main().catch((err) => {
-  console.error(`[scrapeflow] error: ${err?.message ?? err}`);
+  console.error(`[drazta] error: ${err?.message ?? err}`);
   process.exit(1);
 });

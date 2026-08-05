@@ -1,11 +1,11 @@
 {
-  "name": "scrapeflow",
+  "name": "drazta",
   "version": "0.1.0",
   "description": "A clean, extensible web scraping + structured-extraction engine (Ports & Adapters).",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "scrapeflow": "./dist/cli.js"
+    "drazta": "./dist/cli.js"
   },
   "exports": {
     ".": "./dist/index.js"

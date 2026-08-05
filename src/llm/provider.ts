@@ -20,7 +20,7 @@ export function createOpenAIModel(opts: OpenAIProviderOptions = {}) {
     apiKey: opts.apiKey ?? process.env.OPENAI_API_KEY,
     baseURL: opts.baseURL ?? process.env.OPENAI_BASE_URL,
   });
-  const modelName = opts.model ?? process.env.SCRAPEFLOW_MODEL ?? "gpt-4o-mini";
+  const modelName = opts.model ?? process.env.DRAZTA_MODEL ?? "gpt-4o-mini";
   return { model: openai(modelName), modelName };
 }
 

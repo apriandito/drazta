@@ -14,7 +14,7 @@ export const xlsxSink: ExportSink = {
     opts?: Record<string, unknown>,
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
-    wb.creator = "ScrapeFlow";
+    wb.creator = "Drazta";
     wb.created = new Date();
 
     const records = (opts?.records as Record<string, unknown>[] | undefined) ?? null;

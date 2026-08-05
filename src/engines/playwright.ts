@@ -34,7 +34,7 @@ const LAUNCH_ARGS = [
 
 /** Resolve a chromium executable: explicit env, or a common pre-installed path. */
 function resolveExecutablePath(): string | undefined {
-  const envPath = process.env.SCRAPEFLOW_CHROMIUM_PATH;
+  const envPath = process.env.DRAZTA_CHROMIUM_PATH;
   if (envPath && existsSync(envPath)) return envPath;
   const common = "/opt/pw-browsers/chromium";
   if (existsSync(common)) return common;

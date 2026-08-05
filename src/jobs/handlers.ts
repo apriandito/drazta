@@ -13,7 +13,7 @@ export interface DefaultHandlerDeps {
 }
 
 /**
- * The built-in job kinds. Each maps a job's `input` to one of ScrapeFlow's
+ * The built-in job kinds. Each maps a job's `input` to one of Drazta's
  * use-cases — so a batch can mix plain scrapes, article/product extraction, and
  * full natural-language agent tasks, all running concurrently.
  */
