@@ -1,7 +1,12 @@
 import type { Document, ScrapeOptions } from "../types.js";
 import { scrapeUrl as defaultScrape } from "./scrape.js";
 import { CrawlQueue } from "../lib/pool.js";
-import { makeUrlFilter, normalizeUrl, type UrlFilter } from "../lib/urls.js";
+import {
+  canonicalKey,
+  makeUrlFilter,
+  normalizeUrl,
+  type UrlFilter,
+} from "../lib/urls.js";
 
 export interface CrawlOptions extends UrlFilter {
   /** Max pages to scrape. Default 50. */
@@ -88,7 +93,14 @@ export async function crawl(seed: string, opts: CrawlOptions = {}): Promise<Craw
     }
   };
 
-  queue = new CrawlQueue<Task>(concurrency, worker, (t) => t.url);
+  // Dedup on the canonical key, not the fetchable URL: it collapses www/http/
+  // trailing-slash/index.html/utm variants that would otherwise be crawled as
+  // separate pages. The task still carries the fetchable form.
+  queue = new CrawlQueue<Task>(
+    concurrency,
+    worker,
+    (t) => canonicalKey(t.url) ?? t.url,
+  );
   queue.add({ url: seedNorm, depth: 0 });
   await queue.onIdle();
 

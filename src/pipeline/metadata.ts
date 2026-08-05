@@ -38,15 +38,45 @@ function findPublishDate(
   return {};
 }
 
-/** Derives title/description/language/publishDate from raw HTML. */
+/** Author from the standards sites already emit for SEO. Social-profile URLs
+ * masquerading as authors are rejected — a common failure on news templates. */
+function findAuthor($: cheerio.CheerioAPI): string | undefined {
+  const candidates = [
+    $('meta[name="author"]').attr("content"),
+    $('meta[property="article:author"]').attr("content"),
+    $('meta[name="byl"]').attr("content"),
+    $('[itemprop="author"] [itemprop="name"]').first().text(),
+    $('[rel="author"]').first().text(),
+  ];
+  for (const raw of candidates) {
+    const v = raw?.trim();
+    if (!v || v.length > 120) continue;
+    if (/^https?:\/\//i.test(v)) continue; // an author is a name, not a profile URL
+    return v;
+  }
+  return undefined;
+}
+
+/** Derives title/description/language/publishDate and the SEO-standard fields
+ * (canonical, og:*, author, favicon) from raw HTML. Deterministic; no LLM. */
 export const deriveMetadata: Transformer = {
   name: "deriveMetadata",
   transform(doc: Document): Document {
     if (doc.rawHtml === undefined) return doc;
     const $ = cheerio.load(doc.rawHtml);
+    const base = doc.metadata.url;
 
     const pick = (sel: string, attr = "content"): string | undefined =>
       $(sel).first().attr(attr)?.trim() || undefined;
+
+    const absolute = (v?: string): string | undefined => {
+      if (!v || !base) return v;
+      try {
+        return new URL(v, base).toString();
+      } catch {
+        return v;
+      }
+    };
 
     doc.metadata = {
       ...doc.metadata,
@@ -62,6 +92,23 @@ export const deriveMetadata: Transformer = {
         $("html").attr("lang")?.trim() ||
         pick('meta[http-equiv="content-language"]') ||
         doc.metadata.language,
+      // The site's own statement of which URL this page really is — more
+      // reliable for dedup than anything derived from the request URL.
+      canonical: absolute(pick('link[rel="canonical"]', "href")),
+      ogImage: absolute(
+        pick('meta[property="og:image"]') ||
+          pick('meta[name="twitter:image"]'),
+      ),
+      ogType: pick('meta[property="og:type"]'),
+      siteName: pick('meta[property="og:site_name"]'),
+      section: pick('meta[property="article:section"]'),
+      keywords: pick('meta[name="keywords"]'),
+      author: findAuthor($),
+      favicon: absolute(
+        pick('link[rel="icon"]', "href") ||
+          pick('link[rel="shortcut icon"]', "href") ||
+          pick('link[rel="apple-touch-icon"]', "href"),
+      ),
       ...findPublishDate($),
     };
     return doc;

@@ -10,12 +10,64 @@
 import type { z } from "zod";
 import type { Document, RawResult, ScrapeOptions } from "../types.js";
 
+/**
+ * Capabilities a request can require. Engines declare which they support; the
+ * registry scores engines against what a given request actually needs.
+ *
+ * This replaces a boolean `canHandle()` because "can this engine handle it?"
+ * is rarely yes/no. An engine may support 3 of the 4 things a request wants,
+ * and that engine is still the right first attempt — a boolean throws that
+ * information away, so routing has to be re-hardcoded every time an engine is
+ * added. Weighted flags mean a new engine is one declaration, not a rewrite.
+ */
+export type FeatureFlag =
+  | "javascript" // page only renders under a real browser
+  | "stealth" // needs anti-bot evasion to get past a wall
+  | "screenshot"
+  | "waitFor" // needs to wait for late content
+  | "cookies" // needs session/consent continuity across redirects
+  | "location"; // needs locale/geo control
+
+/**
+ * How much each capability matters when scoring engines. An engine that misses
+ * a high-priority flag falls below the threshold and is dropped; missing a
+ * cheap one only costs it position.
+ */
+export const FEATURE_PRIORITY: Readonly<Record<FeatureFlag, number>> = {
+  javascript: 100,
+  stealth: 50,
+  screenshot: 20,
+  waitFor: 10,
+  cookies: 10,
+  location: 10,
+};
+
 /** Fetches raw HTML for a URL. The ONLY layer that differs per strategy. */
 export interface FetchEngine {
   readonly name: string;
-  /** Cheap routing check: can/should this engine handle the request? */
-  canHandle(url: string, opts: ScrapeOptions): boolean;
-  fetch(url: string, opts: ScrapeOptions): Promise<RawResult>;
+
+  /** Which capabilities this engine provides. */
+  readonly features: Readonly<Record<FeatureFlag, boolean>>;
+
+  /**
+   * Ordering weight among engines with equal capability support. Higher wins.
+   * Negative is reserved for specialty engines that should never be chosen
+   * unless a request explicitly needs what only they provide.
+   */
+  readonly quality: number;
+
+  /**
+   * How long this engine may plausibly take for this request. NOT a timeout —
+   * it is the point at which waiting longer is a worse bet than starting the
+   * next engine in parallel. See the hedging loop in core/scrape.ts.
+   */
+  maxReasonableTime(opts: ScrapeOptions): number;
+
+  /**
+   * Fetch raw material. Never parses. Must abort promptly when the signal
+   * fires, so a hedged engine that lost the race stops burning resources.
+   */
+  fetch(url: string, opts: ScrapeOptions, signal?: AbortSignal): Promise<RawResult>;
 }
 
 /** One deterministic step in the shared parse pipeline. */

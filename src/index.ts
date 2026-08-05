@@ -21,7 +21,26 @@ export type {
   ExtractorMeta,
 } from "./core/ports.js";
 
-export { scrapeUrl, NoEnginesLeftError } from "./core/scrape.js";
+export { scrapeUrl } from "./core/scrape.js";
+
+// Error taxonomy — `fatal` tells the waterfall whether another engine could help
+export {
+  ScrapeError,
+  DNSError,
+  SSLError,
+  SiteError,
+  TimeoutError,
+  PageRejectedError,
+  UnsupportedContentError,
+  BlockedAddressError,
+  NoEnginesLeftError,
+  AddFeatureError,
+  classifyFetchError,
+} from "./core/errors.js";
+
+// SSRF-safe HTTP (per-hop address checks + cookie jar)
+export { safeFetch, isPrivateAddress } from "./lib/safeFetch.js";
+export type { SafeFetchOptions, SafeFetchResult } from "./lib/safeFetch.js";
 export { extractStructured } from "./core/extract.js";
 export type { ExtractArgs } from "./core/extract.js";
 
@@ -32,10 +51,12 @@ export { crawl } from "./core/crawl.js";
 export type { CrawlOptions, CrawlResult } from "./core/crawl.js";
 export {
   normalizeUrl,
+  canonicalKey,
   sameSite,
   matchesPrefix,
   makeUrlFilter,
 } from "./lib/urls.js";
+export { rewriteUrl } from "./lib/rewriteUrl.js";
 export { normalizeDate } from "./lib/dates.js";
 export type { NormalizedDate } from "./lib/dates.js";
 
@@ -75,7 +96,13 @@ export {
 export type { CellType } from "./lib/coerce.js";
 
 // Resilience layer
-export { withRetry, detectBlock, evaluateResult } from "./engines/resilience.js";
+export {
+  withRetry,
+  detectBlock,
+  evaluateResult,
+  evaluateDocument,
+  detectUnsupportedContent,
+} from "./engines/resilience.js";
 
 // Deterministic extraction (LLM-writes-code-once, cached, sandboxed)
 export { extractDeterministic } from "./extract/deterministic/extract.js";
@@ -93,7 +120,14 @@ export {
   tooStrictFeedback,
 } from "./extract/deterministic/selectorRepair.js";
 
-export { engines, buildFallbackList } from "./engines/registry.js";
+export {
+  engines,
+  buildFallbackList,
+  requiredFeatures,
+} from "./engines/registry.js";
+export type { EngineChoice } from "./engines/registry.js";
+export { FEATURE_PRIORITY } from "./core/ports.js";
+export type { FeatureFlag } from "./core/ports.js";
 export { transformerStack, runPipeline } from "./pipeline/index.js";
 
 export { createOpenAIProvider } from "./llm/provider.js";

@@ -57,15 +57,18 @@ export const htmlToMarkdown: Transformer = {
 
     doc.markdown = postProcess(converter.turndown(doc.html));
 
-    // Anti-empty fallback: if main-content extraction yielded nothing, retry
-    // against the full raw HTML so a page never comes back blank.
-    if (
-      ctx.options.onlyMainContent &&
-      (!doc.markdown || doc.markdown.length === 0) &&
-      doc.rawHtml
-    ) {
-      ctx.log("markdown empty after main-content extraction; retrying full");
-      doc.markdown = postProcess(converter.turndown(doc.rawHtml));
+    // Last-resort anti-empty guard. cleanHtml already widens its scope when
+    // main-content extraction comes up thin, so reaching here means the
+    // cleaned DOM itself converted to nothing. Strip scripts/styles from the
+    // raw HTML before converting — feeding turndown raw <script> bodies turns
+    // an empty page into a page full of JavaScript, which is worse.
+    if ((!doc.markdown || doc.markdown.length === 0) && doc.rawHtml) {
+      ctx.log("markdown empty after conversion; retrying against raw html");
+      const stripped = doc.rawHtml.replace(
+        /<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi,
+        "",
+      );
+      doc.markdown = postProcess(converter.turndown(stripped));
     }
 
     return doc;

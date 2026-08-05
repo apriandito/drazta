@@ -77,14 +77,36 @@ async function isPlaywrightInstalled(): Promise<boolean> {
 export const playwrightEngine: FetchEngine = {
   name: "playwright",
 
-  canHandle(_url: string, _opts: ScrapeOptions): boolean {
-    return playwrightAvailable !== false;
+  features: {
+    javascript: true,
+    // Light stealth only (see LAUNCH_ARGS above) — enough for basic bot
+    // checks, not for hardened marketplaces. Declared true because it IS the
+    // best stealth available here; a real stealth engine would outrank it on
+    // quality once registered.
+    stealth: true,
+    screenshot: true,
+    waitFor: true,
+    cookies: true,
+    location: true,
   },
 
-  async fetch(url: string, opts: ScrapeOptions): Promise<RawResult> {
+  // Below fetch: capable of far more, but pays a browser launch for it, so it
+  // only wins when the request actually needs what it provides.
+  quality: 50,
+
+  maxReasonableTime(opts: ScrapeOptions): number {
+    return opts.timeoutMs ?? 45_000;
+  },
+
+  async fetch(
+    url: string,
+    opts: ScrapeOptions,
+    signal?: AbortSignal,
+  ): Promise<RawResult> {
     if (!(await isPlaywrightInstalled())) {
       throw new Error("playwright is not installed");
     }
+    signal?.throwIfAborted();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browser = (await getBrowser()) as any;
     const context = await browser.newContext({
@@ -98,14 +120,20 @@ export const playwrightEngine: FetchEngine = {
     await context.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => undefined });
     });
+    // Losing the hedging race must tear the browser context down, or a
+    // superseded page keeps a tab (and its memory) alive to completion.
+    const onAbort = () => void context.close().catch(() => {});
+    signal?.addEventListener("abort", onAbort, { once: true });
+
     const page = await context.newPage();
     try {
       const response = await page.goto(url, {
         waitUntil: "domcontentloaded",
         timeout: opts.timeoutMs ?? 45_000,
       });
-      // Give client-rendered content a brief moment to populate.
-      await page.waitForTimeout(1200);
+      // Give client-rendered content a moment to populate.
+      await page.waitForTimeout(opts.waitForMs ?? 1200);
+      signal?.throwIfAborted();
       const rawHtml = await page.content();
       return {
         rawHtml,
@@ -114,7 +142,8 @@ export const playwrightEngine: FetchEngine = {
         resolvedUrl: page.url(),
       };
     } finally {
-      await context.close();
+      signal?.removeEventListener("abort", onAbort);
+      await context.close().catch(() => {});
     }
   },
 };

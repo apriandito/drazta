@@ -1,5 +1,10 @@
 import { scrapeUrl } from "./scrape.js";
-import { makeUrlFilter, normalizeUrl, type UrlFilter } from "../lib/urls.js";
+import {
+  canonicalKey,
+  makeUrlFilter,
+  normalizeUrl,
+  type UrlFilter,
+} from "../lib/urls.js";
 
 /** Parse <loc> entries from a sitemap or sitemap-index XML. Pure + testable. */
 export function parseSitemap(xml: string): { locs: string[]; isIndex: boolean } {
@@ -77,9 +82,13 @@ export async function mapSite(seed: string, opts: MapOptions = {}): Promise<MapE
   const keep = makeUrlFilter(seed, opts);
   const found = new Map<string, MapEntry>();
 
+  // Keyed by canonical form so a sitemap listing both /a/ and /a/index.html
+  // yields one entry; the fetchable form is what we hand back.
   const addLoc = (raw: string, source: MapEntry["source"]) => {
     const n = normalizeUrl(raw, seed);
-    if (n && keep(n) && !found.has(n)) found.set(n, { url: n, source });
+    if (!n || !keep(n)) return;
+    const key = canonicalKey(n) ?? n;
+    if (!found.has(key)) found.set(key, { url: n, source });
   };
 
   // 1. Sitemaps from robots.txt + the conventional /sitemap.xml.
