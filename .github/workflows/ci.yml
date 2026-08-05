@@ -35,7 +35,7 @@ jobs:
 
       - run: npm run typecheck
 
-      # 116 checks. No network, no API key.
+      # 128 checks. No network, no API key.
       - run: npm test
 
       # `npm run test:duck` is deliberately not run here: it exercises the

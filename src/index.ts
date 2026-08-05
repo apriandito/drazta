@@ -127,6 +127,12 @@ export {
   shutdownEngines,
 } from "./engines/registry.js";
 export type { EngineChoice } from "./engines/registry.js";
+// Stealth engine (optional dep: camoufox-js). ensureCamoufox() downloads or
+// updates the browser; the engine calls it lazily on first use.
+export { camoufoxEngine, ensureCamoufox, closeCamoufox } from "./engines/camoufox.js";
+export type { CamoufoxStatus } from "./engines/camoufox.js";
+export { playwrightEngine, closeBrowser } from "./engines/playwright.js";
+export { fetchEngine } from "./engines/fetch.js";
 export { FEATURE_PRIORITY } from "./core/ports.js";
 export type { FeatureFlag } from "./core/ports.js";
 export { transformerStack, runPipeline } from "./pipeline/index.js";

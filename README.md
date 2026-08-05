@@ -16,6 +16,8 @@ Built on **Ports & Adapters**, so it scales from "URL → clean markdown" to
 ```bash
 npm install
 npx playwright install chromium   # optional — only for JS-heavy pages
+# Camoufox (stealth) needs no install step: the engine downloads and keeps
+# its browser up to date by itself on first use.
 ```
 
 Requires **Node 22+**. The floor is set by jsdom, which the deterministic
@@ -39,7 +41,40 @@ doc.metadata.degraded      // set only if every engine rejected the page
 ```bash
 npm run cli -- https://example.com --main
 npm run serve   # then POST /scrape and /extract
+npm run ui      # the web console on http://localhost:3000
 ```
+
+## The console
+
+`npm run ui` builds the library and starts a Nuxt app that drives every
+use-case from a browser — scrape, article/product extraction, tables and
+multi-page merge, map and crawl, and the agent. It calls Drazta as a **library**
+through Nitro server routes, so there is no second process and no HTTP hop.
+
+Its one organising idea is the library's own: **nothing appears without saying
+where it came from.** Each field carries the layer that produced it, and colour
+is reserved for exactly that claim — teal for what the page stated, an outline
+for what was derived deterministically, violet for what a model inferred, amber
+for `degraded`. Buttons and chrome stay achromatic, so any hue on screen means
+something. Every result also carries a receipt: which engine won the race, the
+status code, characters of text that survived parsing, and elapsed time.
+
+The Scrape page leads with the **routing plan** — the real output of
+`buildFallbackList` for the options you have set. Toggle *Needs a browser* and
+the waterfall re-plans in front of you: `fetch` is struck out as lacking
+`javascript`, and the browser engines move up with their coverage scores. After
+a run, the engine that produced the document is marked. It is the plan, though,
+not a trace: hedging means the engines below the winner may never have started.
+
+```bash
+npm run ui                        # build + dev server
+OPENAI_API_KEY=sk-… npm run ui    # the Agent page needs a key; nothing else does
+npm run ui:build                  # production build of the console
+```
+
+The console lives in [`ui/`](ui/) and is a workspace, so a plain `npm install`
+at the root sets it up. It is dev tooling, not part of the published package —
+`files` still ships `dist` only.
 
 ## Why this shape
 
@@ -48,7 +83,7 @@ browser. Parsing should be identical no matter who fetched. The design splits
 hard along that line:
 
 ```
-Entrypoints:  REST API · CLI · Jobs CLI · Agent loop
+Entrypoints:  REST API · CLI · Jobs CLI · Agent loop · Web console
                     │  call the same use-cases
 Use-cases:    scrapeUrl · crawl · mapSite · extractStructured · deepExtract · runAgent
                     │  depend only on PORTS (interfaces)
@@ -62,6 +97,11 @@ The core never changes.
 ## The engine layer
 
 Four mechanisms decide what you actually get back.
+
+Three engines ship: `fetch` (plain HTTP), `playwright` (Chromium, for
+JavaScript), and `camoufox` (a patched Firefox, for stealth). Pick one
+explicitly with `{ engine: "camoufox" }`, or describe what you need and let
+routing choose.
 
 **Capability routing.** Engines declare a feature matrix (`javascript`,
 `stealth`, `screenshot`, `waitFor`, `cookies`, `location`) and a quality
@@ -91,8 +131,41 @@ into one string is what makes a scraper pay for a browser on a domain that does
 not exist.
 
 ```ts
-const doc = await scrapeUrl(url, { requiresJs: true, features: ["stealth"] });
+// Describe the need — routing picks the engine.
+await scrapeUrl(url, { requiresJs: true });        // → playwright
+await scrapeUrl(url, { features: ["stealth"] });   // → camoufox
+
+// Or name it. A pinned engine is never overridden.
+await scrapeUrl(url, { engine: "camoufox" });
+await scrapeUrl(url, { engine: "playwright" });
 ```
+
+## Stealth: Camoufox
+
+Playwright's Chromium hides `navigator.webdriver` and little else; a real
+fingerprint test sees through it immediately. Camoufox is a patched Firefox
+that spoofs the fingerprint at the C++ level — screen, fonts, WebGL,
+navigator, timezone — so a page cannot tell it is automated from JavaScript.
+
+It carries a ~600 MB browser, so nothing is downloaded at install time. The
+engine fetches it on first use and **keeps it current on its own**: Camoufox
+ships fingerprint fixes as anti-bot vendors adapt, so a stale build is a
+degraded build. Missing is always downloaded; outdated is checked at most once
+a day (one GitHub API call) and a failed check never breaks a working install.
+
+```bash
+DRAZTA_CAMOUFOX_AUTO_UPDATE=0     # pin the current build
+DRAZTA_CAMOUFOX_UPDATE_HOURS=24   # how often to check
+CAMOUFOX_INSTALL_DIR=/opt/camoufox
+```
+
+Because it is heavier than Chromium, `camoufox` sorts last on quality and only
+leads when `stealth` is actually required — which is exactly what a 403 or an
+anti-bot wall asks for when it triggers a re-plan.
+
+*Verified live:* reports a genuine Firefox 152 user-agent (Playwright reports
+Chrome), and bot.sannysoft.com's own WebDriver probe returns
+`missing (passed)`.
 
 ## Safety: SSRF
 
@@ -351,12 +424,15 @@ summaries, so page content never floods the model context.
 | `src/store/duckdb.ts` | DuckDB landing store (optional dep) |
 | `src/export/*` | Output sinks: markdown, json, **xlsx** |
 | `src/server/api.ts` | Hono REST API |
+| `ui/server/api/*` | Nitro routes — the console's thin wrapper over the use-cases |
+| `ui/app/*` | Nuxt 4 + Tailwind 4 console: pages, provenance stamps, receipts |
 
 ## Tests
 
 ```bash
-npm test            # 116 checks across 12 files — no API key, no network
-npm run test:live   # 16 checks against the real web (news, Wikipedia, stores)
+npm test              # 128 checks across 13 files — no API key, no network
+npm run test:live     # 16 checks against the real web (news, Wikipedia, stores)
+npm run test:camoufox # 8 checks: stealth install, update throttle, fingerprint
 npm run test:duck   # requires the optional @duckdb/node-api dep
 ```
 
@@ -370,7 +446,7 @@ propagation, re-planning, the error taxonomy, and the SSRF guard.
 
 - [ ] A page cache as a first-class engine (tried first, misses waterfall)
 - [ ] A hardened `SandboxRunner` (isolated-vm)
-- [ ] A stealth `FetchEngine` with residential proxies
+- [ ] Residential proxy support for the stealth engine
 - [ ] Distributed queue (BullMQ/Redis) behind the `JobStore` port
 - [ ] A `search` tool for the agent
 

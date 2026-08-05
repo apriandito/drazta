@@ -6,6 +6,7 @@ import {
 import type { ScrapeOptions } from "../types.js";
 import { fetchEngine } from "./fetch.js";
 import { closeBrowser, playwrightEngine } from "./playwright.js";
+import { camoufoxEngine, closeCamoufox } from "./camoufox.js";
 
 /**
  * Releases every resource the engines hold — today that is the shared browser.
@@ -13,7 +14,7 @@ import { closeBrowser, playwrightEngine } from "./playwright.js";
  * scraped a JS-rendered page stays alive holding an idle Chromium.
  */
 export async function shutdownEngines(): Promise<void> {
-  await closeBrowser();
+  await Promise.all([closeBrowser(), closeCamoufox()]);
 }
 
 /**
@@ -21,7 +22,11 @@ export async function shutdownEngines(): Promise<void> {
  * service, ...) register it here and declare its feature matrix — routing is
  * computed, so nothing else in the system changes.
  */
-export const engines: FetchEngine[] = [fetchEngine, playwrightEngine];
+export const engines: FetchEngine[] = [
+  fetchEngine,
+  playwrightEngine,
+  camoufoxEngine,
+];
 
 /** Translates request options into the capabilities they imply. */
 export function requiredFeatures(opts: ScrapeOptions): Set<FeatureFlag> {

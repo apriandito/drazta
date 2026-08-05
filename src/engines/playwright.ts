@@ -6,11 +6,11 @@ import type { RawResult, ScrapeOptions } from "../types.js";
  * Browser engine for JS-heavy pages. Playwright is an OPTIONAL dependency and
  * the browser is launched lazily, so the whole project still installs and runs
  * (via the fetch engine) on machines without a browser. If Playwright isn't
- * present, canHandle() returns false and the fallback list skips this engine.
+ * installed, fetch() throws and the waterfall moves on.
  *
- * Includes light stealth (realistic UA/viewport, navigator.webdriver hidden,
- * automation flags off) so basic bot checks don't immediately reject us. This
- * is NOT full stealth — hardened targets still need residential proxies.
+ * It applies cosmetic hardening only (realistic UA/viewport, navigator.webdriver
+ * hidden, automation flags off) — enough that a naive bot check does not reject
+ * it outright. Real fingerprint evasion lives in the camoufox engine.
  */
 
 const UA =
@@ -102,11 +102,12 @@ export const playwrightEngine: FetchEngine = {
 
   features: {
     javascript: true,
-    // Light stealth only (see LAUNCH_ARGS above) — enough for basic bot
-    // checks, not for hardened marketplaces. Declared true because it IS the
-    // best stealth available here; a real stealth engine would outrank it on
-    // quality once registered.
-    stealth: true,
+    // NOT stealth. The launch flags above hide navigator.webdriver and little
+    // else — enough for a naive bot check, useless against a real fingerprint
+    // test. Claiming it would let a `stealth` re-plan pick Chromium and hit
+    // the same wall again; camoufox is the engine that actually answers that
+    // requirement, so this stays honest and routing sends stealth work there.
+    stealth: false,
     screenshot: true,
     waitFor: true,
     cookies: true,

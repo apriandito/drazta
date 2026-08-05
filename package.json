@@ -54,9 +54,10 @@
     "agent": "tsx src/agent-cli.ts",
     "jobs": "tsx src/jobs-cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/smoke.ts && tsx scripts/smoke-crawl.ts && tsx scripts/smoke-dates.ts && tsx scripts/smoke-article.ts && tsx scripts/smoke-product.ts && tsx scripts/smoke-tables.ts && tsx scripts/smoke-tidy.ts && tsx scripts/smoke-deep.ts && tsx scripts/smoke-quality.ts && tsx scripts/smoke-engine.ts && tsx scripts/smoke-jobs.ts && tsx scripts/smoke-agent.ts",
+    "test": "tsx scripts/smoke.ts && tsx scripts/smoke-crawl.ts && tsx scripts/smoke-dates.ts && tsx scripts/smoke-article.ts && tsx scripts/smoke-product.ts && tsx scripts/smoke-tables.ts && tsx scripts/smoke-tidy.ts && tsx scripts/smoke-deep.ts && tsx scripts/smoke-quality.ts && tsx scripts/smoke-engine.ts && tsx scripts/smoke-camoufox.ts && tsx scripts/smoke-jobs.ts && tsx scripts/smoke-agent.ts",
     "test:duck": "tsx scripts/smoke-duck.ts",
-    "test:live": "tsx scripts/verify-live.ts"
+    "test:live": "tsx scripts/verify-live.ts",
+    "test:camoufox": "tsx scripts/verify-camoufox.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",
@@ -73,7 +74,8 @@
   },
   "optionalDependencies": {
     "@duckdb/node-api": "^1.5.5-r.3",
-    "playwright": "^1.48.0"
+    "camoufox-js": "^0.12.0",
+    "playwright": "1.60.0"
   },
   "devDependencies": {
     "@types/jsdom": "^28.0.3",

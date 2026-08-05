@@ -75,10 +75,14 @@ function testRouting() {
   const cheap = fakeEngine("cheap", async () => ({ rawHtml: RICH }));
   const browser = fakeEngine("browser", async () => ({ rawHtml: RICH }), { strong: true });
 
-  // No requirements -> pure quality order, cheapest-and-best first.
+  // No requirements -> pure quality order, cheapest-and-best first. Asserted
+  // against the real registry rather than a fixed list, so registering a new
+  // engine updates the expectation instead of breaking an unrelated test.
   const plain = buildFallbackList("https://x.test/", {}, []);
-  assert.deepEqual(plain.map((c) => c.engine.name), ["fetch", "playwright"]);
-  ok("with no requirements, engines rank by quality (fetch before playwright)");
+  const byQuality = [...engines].sort((a, b) => b.quality - a.quality).map((e) => e.name);
+  assert.deepEqual(plain.map((c) => c.engine.name), byQuality);
+  assert.equal(plain[0].engine.name, "fetch", "the cheapest engine should lead");
+  ok(`with no requirements, engines rank by quality (${byQuality.join(" → ")})`);
 
   withEnginesSync([cheap, browser], () => {
     const list = buildFallbackList("https://x.test/", {}, []);
