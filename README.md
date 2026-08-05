@@ -1,172 +1,295 @@
 # Drazta
 
-A clean, extensible web-scraping + structured-extraction engine, built on a
-**Ports & Adapters** (hexagonal) architecture so it can grow from
-"URL → clean markdown" all the way to an agentic
-"describe what you want → get an Excel" workflow without rewrites.
+A web-scraping and structured-extraction engine that tries to be honest about
+what it got. It fetches a page with whichever strategy fits, parses it through
+one deterministic pipeline, and refuses to hand you an anti-bot wall or a PDF's
+binary while calling it content.
 
-> Original, MIT-licensed, clean-room implementation. Not derived from any
-> AGPL codebase — it shares only well-known architectural ideas.
+Built on **Ports & Adapters**, so it scales from "URL → clean markdown" to
+"describe what you want → get an Excel" without rewrites.
 
-## Why this shape
-
-Fetching is the only thing that varies per site (static HTTP vs. a real
-browser). Parsing should be identical no matter who fetched. So the design
-splits hard along that line:
-
-```
-Entrypoints:  REST API · CLI · (future) MCP / Agent loop
-                    │  call the same use-cases
-Use-cases:    scrapeUrl · extractStructured · (future) crawl · runAgentTask
-                    │  depend only on PORTS (interfaces)
-Adapters:  FetchEngine │ Transformer │ LLMProvider │ ExportSink │ AgentTool
-           fetch,play. │ clean,md,…  │ openai,…    │ md,json,xlsx│ (future)
-```
-
-Add an engine / LLM / output format = write **one adapter**. The core never
-changes. That is the whole point.
-
-## Layout
-
-| Path | Role |
-|------|------|
-| `src/types.ts` | Domain types (`Document`, `ScrapeOptions`, `RawResult`) |
-| `src/core/ports.ts` | The extension seams (all interfaces) |
-| `src/core/scrape.ts` | `scrapeUrl` — engine fallback + pipeline |
-| `src/core/extract.ts` | `extractStructured` — LLM → Zod schema |
-| `src/engines/*` | Fetch strategies (`fetch`, `playwright`) + registry |
-| `src/pipeline/*` | The single deterministic parse stack |
-| `src/llm/provider.ts` | Provider-agnostic LLM adapter (Vercel AI SDK) |
-| `src/export/*` | Output sinks: markdown, json, **xlsx** |
-| `src/server/api.ts` | Hono REST API |
-| `src/cli.ts` | CLI |
+> Original MIT-licensed, clean-room implementation. It reimplements
+> well-known scraping mechanisms from scratch; no AGPL source was copied.
 
 ## Install
 
 ```bash
 npm install
-# Browser engine is optional. To enable JS-heavy pages:
-npx playwright install chromium
+npx playwright install chromium   # optional — only for JS-heavy pages
 ```
 
-## Use — as a library
+Requires Node 20+ (`AbortSignal.any`, `Headers.getSetCookie`).
+
+## Quick start
 
 ```ts
-import { scrapeUrl, extractStructured, createOpenAIProvider } from "drazta";
-import { z } from "zod";
+import { scrapeUrl } from "drazta";
 
 const doc = await scrapeUrl("https://example.com", {
   formats: ["markdown"],
   onlyMainContent: true,
 });
-console.log(doc.markdown);
-
-// Structured extraction
-const llm = createOpenAIProvider(); // reads OPENAI_API_KEY
-const data = await extractStructured({
-  document: doc,
-  prompt: "Extract the article headline and summary",
-  schema: z.object({ title: z.string(), summary: z.string() }),
-  llm,
-});
+doc.markdown;              // clean markdown, absolute links and images
+doc.metadata.publishedDate // "2026-08-04", from the page's own JSON-LD
+doc.metadata.degraded      // set only if every engine rejected the page
 ```
-
-## Use — CLI
 
 ```bash
 npm run cli -- https://example.com --main
-npm run cli -- https://example.com --format links
-npm run cli -- https://example.com --js --engine playwright
+npm run serve   # then POST /scrape and /extract
 ```
 
-## Use — API
+## Why this shape
 
-```bash
-npm run serve
-curl -X POST localhost:3000/scrape \
-  -H 'content-type: application/json' \
-  -d '{"url":"https://example.com","formats":["markdown"],"onlyMainContent":true}'
-
-# scrape + LLM extract → xlsx
-curl -X POST localhost:3000/extract \
-  -H 'content-type: application/json' \
-  -d '{"url":"https://example.com","fields":{"title":"string"},"export":"xlsx"}' \
-  -o out.xlsx
-```
-
-## Robustness mechanisms
-
-Clean-room reimplementations of the smart ideas that make a scraper reliable:
-
-**Resilience layer** (`src/engines/resilience.ts`)
-- `withRetry` — exponential backoff per engine.
-- `detectBlock` — recognizes Cloudflare/CAPTCHA/"just a moment" walls so they
-  don't get returned as page content.
-- `evaluateResult` — rejects empty bodies, block pages, and JS-only shells, and
-  flags whether to **escalate** to a stronger engine.
-
-**Deterministic extraction** (`src/extract/deterministic/`) — the big one.
-Instead of calling the LLM on every page (non-deterministic, costly), the LLM
-**writes an extractor once**; the code is cached and every later page runs pure
-deterministic code:
+Fetching is the only thing that varies per site — static HTTP or a real
+browser. Parsing should be identical no matter who fetched. The design splits
+hard along that line:
 
 ```
-first page:  HTML → LLM writes extract(document) → cache → sandbox → JSON
-later pages: HTML → cached extractor → sandbox → JSON        (no LLM)
+Entrypoints:  REST API · CLI · Jobs CLI · Agent loop
+                    │  call the same use-cases
+Use-cases:    scrapeUrl · crawl · mapSite · extractStructured · deepExtract · runAgent
+                    │  depend only on PORTS (interfaces)
+Adapters:  FetchEngine │ Transformer │ LLMProvider │ ExportSink │ AgentTool │ SandboxRunner
+           fetch, playw.│ clean,md,…  │ openai,…    │ md,json,xlsx│ 4 tools   │ jsdom+vm
 ```
 
-- **Sandbox** (`sandbox.ts`) — jsdom with `runScripts: "outside-only"` (the
-  page's scripts never run), a `vm` context, a JSON realm boundary, and a
-  synchronous+async timeout. `SandboxRunner` is a port, so a hardened jail
-  (isolated-vm / external service) is a drop-in swap.
-- **Self-repair** (`selectorRepair.ts`) — statically detects too-strict `>`
-  selectors that match 0 elements and feeds the model precise fix instructions;
-  regenerates once.
-- **Fail honestly** — a sandbox throw or schema-validation mismatch triggers one
-  regeneration; a second failure **propagates** instead of returning empty data.
-- **Cache** (`cache.ts`) — memory or file backend, keyed by
-  `hash(version + model + url + schema + prompt)`.
+Adding an engine, an LLM, or an output format means writing **one adapter**.
+The core never changes.
+
+## The engine layer
+
+Four mechanisms decide what you actually get back.
+
+**Capability routing.** Engines declare a feature matrix (`javascript`,
+`stealth`, `screenshot`, `waitFor`, `cookies`, `location`) and a quality
+weight. A request is translated into the capabilities it needs; each engine
+scores the sum of the priorities it satisfies, anything below half the total
+demand is dropped, and survivors sort by coverage then quality.
+
+A boolean `canHandle()` cannot express "covers three of four needs" — so
+routing has to be rewritten every time an engine is added. Scoring makes a new
+engine a single declaration.
+
+**Hedged waterfall.** The next engine does not wait for the current one to
+fail. Once an engine has had its `maxReasonableTime`, the next one starts
+*alongside* it and they race; the first good document wins and the losers get
+an abort signal. A slow-but-doomed HTTP fetch no longer holds the request
+hostage while the browser that would have succeeded sits idle.
+
+**Re-planning.** When an engine learns something that changes the routing, the
+fallback list is rebuilt around that fact instead of blindly advancing one
+slot. A `403` means *this needs stealth*; a JS-only shell means *this needs a
+browser*. Capped at three rounds, and partial results carry across them.
+
+**An error taxonomy where every error answers one question: `fatal`.** Dead
+DNS, refused connection and TLS failure stop the waterfall — no browser launch,
+no three retries — while a wall or a thin page escalates. Collapsing failures
+into one string is what makes a scraper pay for a browser on a domain that does
+not exist.
 
 ```ts
-const data = await extractStructured({
-  document: docWithHtml,          // scrape with formats: ["rawHtml"] or ["html"]
-  schema: z.object({ title: z.string().nullable() }),
-  prompt: "the article headline",
-  llm,
-  strategy: "deterministic",       // <- cached, sandboxed, self-repairing
-});
+const doc = await scrapeUrl(url, { requiresJs: true, features: ["stealth"] });
 ```
 
-Run the mechanism smoke tests (no API key needed):
+## Safety: SSRF
+
+A scraper takes a URL from an untrusted caller and fetches it. That is the
+textbook SSRF shape: without a check, `http://169.254.169.254/` hands over
+cloud credentials and `http://localhost:6379/` reaches the Redis next door.
+Validating the URL string is not enough — a public hostname can resolve to a
+private address, and a public URL can redirect to one.
+
+So `safeFetch` resolves the hostname and refuses non-public addresses, follows
+redirects **manually** while re-checking every hop, and carries cookies across
+those hops so consent/session chains still work.
 
 ```bash
-npx tsx scripts/smoke.ts
+DRAZTA_ALLOW_PRIVATE_IPS=1   # opt out, to scrape a local dev server on purpose
 ```
 
-## Phase 3 — discovery & multi-page
+## Output quality
+
+The difference between a scraper and a good scraper is what survives to the
+output.
+
+- **Judged on text, not bytes.** Quality is evaluated after parsing, on the
+  extracted text. A page can be 200 OK with 60 KB of HTML and no article; byte
+  counts cannot see that.
+- **Never silently empty.** If main-content scoping comes up thin, the scope
+  widens back out. If every engine is rejected but one produced text, that text
+  is returned with `metadata.degraded` set — flagged, not disguised.
+- **Never confidently wrong.** Binary bodies are detected by magic bytes even
+  when the server mislabels them, and refused with `UnsupportedContentError`
+  rather than run through an HTML parser.
+- **Usable links and images.** Lazy `data-src` is promoted, `srcset` resolves
+  to the largest candidate, and every `href`/`src` is absolutized — markdown
+  that leaves the scraper still points somewhere.
+- **Real chrome removal.** ~50 selectors with a force-include guard, so a
+  wrapper classed `.widget` that happens to contain the article (or a data
+  `<table>`) is spared.
+- **Honest dedup.** `canonicalKey()` is a dedup key separate from the fetchable
+  URL: `www`/`http`/`:443`/`index.html`/trailing-slash/`utm_*` variants collapse
+  to one, while `?page=2` and SPA `#/routes` stay distinct.
+- **SEO-standard metadata.** `canonical`, `og:image`, `siteName`, `section`,
+  `author` (social-profile URLs rejected), `favicon`, `publishedDate`.
+
+Some URLs are public but only ever serve an app shell to a scraper while a
+plain-HTML export sits next to them — Google Docs, Sheets, Slides and Drive are
+rewritten to their export endpoints before fetching.
+
+## Discovery — map and crawl
 
 ```ts
 import { mapSite, crawl } from "drazta";
 
-const urls = await mapSite("https://example.com", { limit: 100 }); // sitemap + links
+const urls = await mapSite("https://example.com", { limit: 100 });
 const { documents } = await crawl("https://example.com/blog", {
-  prefix: "https://example.com/blog", // stay in a section
+  prefix: "https://example.com/blog",
   maxDepth: 2,
   limit: 30,
   concurrency: 5,
 });
 ```
 
-`crawl` is a same-site BFS over a concurrency-limited queue that dedups by
-normalized URL. `mapSite` reads `robots.txt` + `sitemap.xml` (following one index
-level) and falls back to homepage links.
+`crawl` is a same-site BFS over a concurrency-limited queue, deduped by
+canonical key. `mapSite` reads `robots.txt` for `Sitemap:` directives plus
+`sitemap.xml` (following one index level) and falls back to homepage links.
 
-## Running many jobs at once (concurrent scrapers + agents)
+## Universal extractors — one code path, many sites
 
-Submit a batch of jobs — plain scrapes, article/product extraction, or full
-natural-language agent tasks — and a bounded worker pool runs them concurrently,
-tracking status and results. Inspired by the queue-of-agents model (qm), kept
-in-process with a `JobStore` port you can swap for Postgres/Redis later.
+The hard problem: CNN, Detik, Kompas and CNBC lay out their HTML differently,
+yet you want the same structured record from each without per-site code.
+The trick is to lean on the **standards they all emit for SEO**:
+
+```
+1. schema.org JSON-LD  → headline, author, datePublished, body …
+2. Open Graph / <meta>  → og:title, article:author, …
+3. Readability-lite     → main-content body when JSON-LD lacks it
+```
+
+```ts
+import { scrapeUrl, extractArticle, extractProduct } from "drazta";
+
+const doc = await scrapeUrl(url, { formats: ["rawHtml"] });
+extractArticle(doc); // { title, author, publishedDate, body, sources, … }
+extractProduct(doc); // { name, brand, price, currency, availability, sku, … }
+```
+
+Every field records which layer produced it. Verified live against CNN, Detik,
+Kompas and CNBC Indonesia, and on a WooCommerce store — one function, identical
+output shape, no per-site code and no LLM.
+
+**On hardened marketplaces (e.g. Tokopedia):** they return `503`/challenges to
+plain HTTP and detect headless browsers. Drazta *detects* the block and asks for
+stealth; getting *through* needs residential proxies — register that as one more
+`FetchEngine` with `stealth: true` and routing handles the rest. The extractors
+above still apply once you have the HTML.
+
+## Tables → tidy → one dataset
+
+Statistics sites keep the payload in tables, not prose.
+
+```ts
+import { extractTables, largestTable, tidyTable, deepExtract } from "drazta";
+
+const t = tidyTable(largestTable(doc)!, { snakeCase: true });
+// t.columns -> [{name:"population", type:"number"}, {name:"date", type:"date"}]
+// t.rows[0] -> { location:"India", population:1429404000, date:"2026-07-01" }
+```
+
+`tidyTable` infers a type per column, coerces cells, strips footnote markers
+(`[4]`), and drops blanks to `null`. The number parser disambiguates `"1.250"`
+(1250) from `"4.8"` and `"8,232,000,000"`, so Indonesian and US formats both
+land correctly.
+
+Data is often spread across pages — one per year, per region, or paginated.
+`deepExtract` scrapes them concurrently and merges:
+
+```ts
+// UNION — stack rows from paginated pages, tag the source.
+await deepExtract(pages, { merge: "union", sourceColumn: "page" });
+
+// JOIN — widen by a key: inflation per province, one page per year.
+await deepExtract(
+  [{ url: ".../2023", label: "2023" }, { url: ".../2024", label: "2024" }],
+  { merge: "join", key: "provinsi" },  // -> { provinsi, inflasi_2023, inflasi_2024 }
+);
+```
+
+`key: "@first"` joins on each table's first column. Missing cells become `null`,
+a page with no table is reported but never fails the batch, and `matchedKeys`
+tells you how many keys appeared in more than one source. Verified live: joined
+Wikipedia's population and GDP tables by country — **194 countries matched**.
+
+## Land it in DuckDB
+
+```ts
+import { DuckDBDatasetStore } from "drazta";
+
+const db = await DuckDBDatasetStore.open("data.duckdb"); // or ":memory:"
+await db.createFromTidy("countries", table, { replace: true });
+const top = await db.query(`
+  SELECT location, round(imf_2026_gdp*1e6 / population_pop, 0) AS gdp_per_capita
+  FROM countries WHERE population_pop > 5000000
+  ORDER BY gdp_per_capita DESC LIMIT 10
+`);
+await db.exportCsv("countries", "countries.csv");
+```
+
+Column types carry over, NULLs are preserved, BigInt/DATE results are normalized
+to plain JS values. DuckDB is an optional dependency, loaded lazily.
+
+## Deterministic LLM extraction
+
+Calling an LLM on every page is non-deterministic and costly. Instead the LLM
+**writes an extractor once**; the code is cached and every later page runs pure
+deterministic code.
+
+```
+first page:  HTML → LLM writes extract(document) → cache → sandbox → JSON
+later pages: HTML → cached extractor → sandbox → JSON        (no LLM)
+```
+
+```ts
+const data = await extractStructured({
+  document: docWithHtml,     // scrape with formats: ["rawHtml"] or ["html"]
+  schema: z.object({ title: z.string().nullable() }),
+  prompt: "the article headline",
+  llm,
+  strategy: "deterministic",
+});
+```
+
+- **Sandbox** — jsdom with `runScripts: "outside-only"` (the page's own scripts
+  never run), a `vm` context, a JSON realm boundary, and sync+async timeouts.
+  `SandboxRunner` is a port, so a hardened jail (isolated-vm, an external
+  service) is a drop-in swap. The default runner is *not* a security boundary
+  against hostile generated code.
+- **Self-repair** — statically detects too-strict `>` selectors matching zero
+  elements and regenerates once with precise feedback.
+- **Fail honestly** — a sandbox throw or schema mismatch triggers one
+  regeneration; a second failure propagates rather than returning empty data.
+- **Cache** — memory or file backend, keyed by
+  `hash(version + model + url + schema + prompt)`.
+
+## Dates
+
+News dates arrive as `16 Juni 2026`, `04 August 2026 09:00`, or ISO. Rather
+than trust an LLM to normalize, the pipeline pulls a machine-readable date
+deterministically: JSON-LD `datePublished` → `<meta article:published_time>` →
+`<time datetime>`.
+
+```ts
+normalizeDate("16 Juni 2026").date;        // "2026-06-16"
+normalizeDate("04 August 2026 09:00").iso; // "2026-08-04T09:00:00"
+```
+
+Understands ISO, English and Indonesian month names, day-first numerics, and
+compact URL timestamps. The principle throughout: **deterministic where
+possible, LLM only as fallback.**
+
+## Running many jobs at once
 
 ```ts
 import { JobManager, createDefaultHandlers } from "drazta";
@@ -177,218 +300,77 @@ const results = await mgr.submitAndRun([
   { kind: "product", input: { url: "https://shop.example/p/123" } },
   { kind: "agent",   input: { task: "berita ekonomi syariah di CNBC jadi Excel" } },
 ]);
-// each result: { id, kind, status, result | error, timings, progress }
 ```
 
 ```bash
 npm run jobs -- jobs.json --concurrency 4 --out results.json
 ```
 
-The pool is bounded (never more than `concurrency` in flight), a failing job is
-isolated (siblings keep running), and status is queryable live (`mgr.status(id)`)
-so a server/dashboard can show progress. Verified live: 4 mixed jobs across 4
-sites finished in ~one job's wall-time, not the sum — real parallelism.
+The pool is bounded, a failing job is isolated so siblings keep running, and
+status is queryable live (`mgr.status(id)`). `JobStore` is a port — swap the
+in-memory one for Postgres/Redis later.
 
-## Phase 4 — the agent (your mission)
+## The agent
 
 ```bash
 OPENAI_API_KEY=... npm run agent -- "berita ekonomi syariah di CNBC, jadikan Excel"
 ```
 
 ```ts
-import { runAgent } from "drazta";
-
 const { files, records } = await runAgent({
   task: "collect Islamic-economy news from CNBC Indonesia into an Excel file",
 });
 // files[0].bytes -> the .xlsx
 ```
 
-The agent (`src/agent/`) is just Phases 1–3 wrapped as tools:
-
 ```
 NL task → LLM plans → map_site → scrape_pages → extract_records → export_xlsx
 ```
 
-Each tool stashes big artifacts (pages, rows) in an `AgentSession` and returns
-only compact summaries, so page content never floods the model context. Adding
-Phase 4 required **no changes** to earlier phases — exactly what the `AgentTool`
-port was placed for on day one.
+Each tool stashes big artifacts in an `AgentSession` and returns only compact
+summaries, so page content never floods the model context.
 
-## Universal article extractor (one code, many sites)
+## Layout
 
-The hard problem: CNN, Detik, Kompas, CNBC all lay out their HTML differently —
-yet you want **the same structured record** from each, without writing per-site
-code. `extractArticle(doc)` does this with a layered, single code path:
-
-```
-1. schema.org JSON-LD (NewsArticle)  → headline, author, datePublished, body …
-2. Open Graph / <meta> fallbacks     → og:title, article:author, …
-3. Readability-lite                  → main-content body when JSON-LD lacks it
-```
-
-It generalizes not by knowing each site, but by leaning on the **standards they
-all emit for SEO** (JSON-LD is near-universal on news sites). Every field records
-its `source` so you can see which layer produced it.
-
-```ts
-import { scrapeUrl, extractArticle } from "drazta";
-const doc = await scrapeUrl(url, { formats: ["rawHtml"] });
-const a = extractArticle(doc);
-// { title, author, publishedDate, publishedTime, description,
-//   section, siteName, image, body, url, sources }
-```
-
-Verified **live** against CNN, Detik, Kompas, and CNBC Indonesia — one function,
-identical output shape, all core fields resolved from JSON-LD, **no per-site code
-and no LLM**. Author values are sanitized (social-URL "authors" rejected) and the
-body is stripped of leading breadcrumb/nav chrome.
-
-## Universal product extractor (e-commerce)
-
-The same pattern generalizes past news. `extractProduct(doc)` resolves any
-store's product page to one canonical shape via schema.org `Product` JSON-LD
-(what shops emit for Google Shopping) with Open Graph product-meta fallback:
-
-```ts
-import { scrapeUrl, extractProduct } from "drazta";
-const doc = await scrapeUrl(url, { formats: ["rawHtml"] });
-const p = extractProduct(doc);
-// { name, brand, price, currency, priceText, availability,
-//   rating, ratingCount, sku, image, description, url, sources }
-```
-
-Prices are parsed robustly (`"Rp1.250.000"`, `"1,250.00"`, `"4.8"` are all
-disambiguated), missing fields stay `null` (never invented). Verified live on a
-WooCommerce store: name/price/sku/availability/image all from JSON-LD, one code
-path, no per-site rules.
-
-**On anti-bot sites (e.g. Tokopedia):** hardened marketplaces return `503`/
-challenges to plain HTTP and detect headless browsers. Drazta's resilience
-layer *detects* the block, but getting *through* needs stealth + residential
-proxies (a `FetchEngine` you plug in) — the extractor above still applies once
-you have the HTML.
-
-## Land data in DuckDB (query with SQL)
-
-For local analysis, land a tidy dataset in an embedded DuckDB database and query
-it with SQL — join, aggregate, export to CSV/Parquet, no server. DuckDB is an
-optional dependency, loaded lazily.
-
-```ts
-import { deepExtract, DuckDBDatasetStore } from "drazta";
-
-const { table } = await deepExtract(sources, { merge: "join", key: "@first" });
-const db = await DuckDBDatasetStore.open("data.duckdb"); // or ":memory:"
-await db.createFromTidy("countries", table, { replace: true });
-
-const top = await db.query(`
-  SELECT location, round(imf_2026_gdp*1e6 / population_pop, 0) AS gdp_per_capita
-  FROM countries WHERE population_pop > 5000000
-  ORDER BY gdp_per_capita DESC LIMIT 10
-`);
-await db.exportCsv("countries", "countries.csv");
-```
-
-Column types carry over (numbers → DOUBLE, dates → ISO VARCHAR), NULLs are
-preserved, and BigInt/DATE results are normalized to plain JS values. Verified
-live end-to-end: two Wikipedia pages → merged dataset → DuckDB → a GDP-per-capita
-query returning correct real-world rankings (Ireland, Switzerland, Singapore…).
-
-```bash
-npm run test:duck   # requires the optional @duckdb/node-api dep
-```
-
-## Deep extract — many pages into one dataset
-
-Data is often spread across pages: one page per year, per region, or a paginated
-list. `deepExtract` scrapes them concurrently, tidies each table, and merges into
-a single dataset — two modes:
-
-```ts
-import { deepExtract } from "drazta";
-
-// UNION — stack rows from paginated pages (same schema), tag the source.
-await deepExtract(pages, { merge: "union", sourceColumn: "page" });
-
-// JOIN — widen by a key column: e.g. inflation per province, one page per year.
-await deepExtract(
-  [ { url: ".../2023", label: "2023" }, { url: ".../2024", label: "2024" } ],
-  { merge: "join", key: "provinsi" },   // -> { provinsi, inflasi_2023, inflasi_2024 }
-);
-```
-
-`key: "@first"` joins on each table's first column (handy when key headers differ
-across pages). Missing cells become `null` (rectangular output), a page with no
-table is reported but never fails the batch, and `matchedKeys` tells you how many
-keys appeared in more than one source. Verified live: joined Wikipedia's
-population and GDP tables by country into one dataset — **194 countries matched**,
-`{ location, population_pop, imf_2026_gdp, ... }`, all typed.
-
-## Tidy & tame data (from the start)
-
-Scraped tables come out as strings — `"1,429,404,000"`, `"1 Jul 2026"`,
-`"Official projection[4]"`. `tidyTable()` turns them into analysis-ready data in
-one pass: it infers a type per column, coerces cells (numbers → `number`, dates
-→ ISO, percents → number), strips footnote markers, drops blanks to `null`, and
-can snake_case headers for SQL/DuckDB.
-
-```ts
-import { extractTables, largestTable, tidyTable } from "drazta";
-
-const t = tidyTable(largestTable(doc)!, { snakeCase: true });
-// t.columns -> [{name:"population", type:"number"}, {name:"date", type:"date"}, ...]
-// t.rows[0] -> { location:"India", population:1429404000, date:"2026-07-01", notes:null }
-```
-
-This is a design principle, not a post-step: every extractor aims to emit tidy,
-typed data (one variable per column, one observation per row) so downstream code
-never re-parses strings. The number parser disambiguates `"1.250"` (1250) from
-`"4.8"` (4.8) and `"8,232,000,000"` (thousands), so Indonesian and US number
-formats both land correctly.
-
-## Data normalization (dates)
-
-Extracted text is messy — news dates come as `16 Juni 2026`, `04 August 2026
-09:00`, or ISO. Rather than trust the LLM to normalize (non-deterministic), the
-pipeline pulls a machine-readable publish date deterministically:
-
-```
-JSON-LD datePublished → <meta article:published_time> → <time datetime>
-```
-
-and every scraped `document.metadata` carries a clean `publishedDate`
-(`YYYY-MM-DD`) + `publishedTime` (ISO). For arbitrary strings there's
-`normalizeDate()`, which understands ISO, English + Indonesian month names,
-numeric day-first, and compact URL timestamps — all collapsed to `YYYY-MM-DD`.
-Principle, again: **deterministic where possible, LLM only as fallback.**
-
-```ts
-normalizeDate("16 Juni 2026").date;        // "2026-06-16"
-normalizeDate("04 August 2026 09:00").iso; // "2026-08-04T09:00:00"
-doc.metadata.publishedDate;                // "2026-08-04" (from the page's JSON-LD)
-```
+| Path | Role |
+|------|------|
+| `src/types.ts` | Domain types (`Document`, `ScrapeOptions`, `RawResult`) |
+| `src/core/ports.ts` | The extension seams — all interfaces, feature flags |
+| `src/core/scrape.ts` | `scrapeUrl` — capability routing, hedging, re-planning |
+| `src/core/errors.ts` | Error taxonomy; every error answers `fatal` |
+| `src/core/extract.ts` | `extractStructured` — LLM → Zod schema |
+| `src/core/{map,crawl}.ts` | Sitemap discovery and same-site BFS crawl |
+| `src/engines/*` | Fetch strategies + scoring registry + resilience |
+| `src/pipeline/*` | The single deterministic parse stack |
+| `src/extract/*` | article · product · tables · tidy · deep · deterministic |
+| `src/lib/safeFetch.ts` | SSRF-checked HTTP with a cookie jar |
+| `src/lib/{urls,dates,coerce}.ts` | Canonicalization and data taming |
+| `src/jobs/*` | Bounded concurrent job pool |
+| `src/store/duckdb.ts` | DuckDB landing store (optional dep) |
+| `src/export/*` | Output sinks: markdown, json, **xlsx** |
+| `src/server/api.ts` | Hono REST API |
 
 ## Tests
 
 ```bash
-npm test   # 33 checks across all phases — no API key / network needed
+npm test        # 113 checks across 12 files — no API key, no network
+npm run test:duck   # requires the optional @duckdb/node-api dep
 ```
 
-Uses fake scrapers and a fake LLM so the full map→scrape→extract→xlsx pipeline
-is verified deterministically (the final workbook is reopened and asserted).
+Fake engines, fake scrapers and a fake LLM make the whole
+map → scrape → extract → xlsx pipeline verifiable deterministically; the final
+workbook is reopened and asserted. The engine suite covers capability routing,
+hedging (asserting the hedged engine actually wins on wall-clock), abort
+propagation, re-planning, the error taxonomy, and the SSRF guard.
 
 ## Roadmap
 
-- [x] **Phase 1** — URL → clean markdown (engines + pipeline)
-- [x] **Phase 2** — structured extract (Zod) + Excel export
-- [x] **Robustness** — retry/backoff, block detection, deterministic
-      sandboxed extraction with self-repair
-- [x] **Phase 3** — map (sitemap) + same-site crawl (concurrency queue)
-- [x] **Phase 4** — agentic: NL task → tools (map/scrape/extract/export)
-- [ ] **Next** — distributed queue (BullMQ/Redis) behind `CrawlQueue`;
-      a `search` tool; a hardened `SandboxRunner` (isolated-vm)
+- [ ] A page cache as a first-class engine (tried first, misses waterfall)
+- [ ] A hardened `SandboxRunner` (isolated-vm)
+- [ ] A stealth `FetchEngine` with residential proxies
+- [ ] Distributed queue (BullMQ/Redis) behind the `JobStore` port
+- [ ] A `search` tool for the agent
 
 ## License
 
-MIT
+MIT © Muhammad Apriandito

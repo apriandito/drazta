@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor the code actually requires (AbortSignal.any,
+        # Headers.getSetCookie); 22 is what development happens on.
+        node: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # Optional deps ARE installed: the suite itself runs on fakes and needs
+      # neither, but `tsc` needs their type declarations to check the two files
+      # that import them (engines/playwright.ts, store/duckdb.ts).
+      # This installs the playwright npm package only — the Chromium binary is a
+      # separate `npx playwright install`, which no test requires.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # 113 checks. No network, no API key.
+      - run: npm test
+
+      # `npm run test:duck` is deliberately not run here: it exercises the
+      # native DuckDB binding rather than Drazta's own logic.

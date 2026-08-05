@@ -1,9 +1,40 @@
 {
   "name": "drazta",
   "version": "0.1.0",
-  "description": "A clean, extensible web scraping + structured-extraction engine (Ports & Adapters).",
+  "description": "Web scraping and structured extraction engine — capability-routed engines, hedged fallback, SSRF-safe fetching, and tidy typed output.",
   "type": "module",
   "license": "MIT",
+  "author": "Muhammad Apriandito",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apriandito/drazta.git"
+  },
+  "homepage": "https://github.com/apriandito/drazta#readme",
+  "bugs": {
+    "url": "https://github.com/apriandito/drazta/issues"
+  },
+  "keywords": [
+    "scraping",
+    "scraper",
+    "crawler",
+    "web-scraping",
+    "structured-extraction",
+    "markdown",
+    "html-to-markdown",
+    "json-ld",
+    "table-extraction",
+    "playwright",
+    "llm",
+    "duckdb"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "drazta": "./dist/cli.js"
   },
