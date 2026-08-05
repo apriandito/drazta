@@ -41,8 +41,13 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "workspaces": [
+    "ui"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "ui": "npm run build && npm --workspace drazta-ui run dev",
+    "ui:build": "npm run build && npm --workspace drazta-ui run build",
     "dev": "tsx watch src/server/api.ts",
     "serve": "tsx src/server/api.ts",
     "cli": "tsx src/cli.ts",
@@ -50,7 +55,8 @@
     "jobs": "tsx src/jobs-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/smoke.ts && tsx scripts/smoke-crawl.ts && tsx scripts/smoke-dates.ts && tsx scripts/smoke-article.ts && tsx scripts/smoke-product.ts && tsx scripts/smoke-tables.ts && tsx scripts/smoke-tidy.ts && tsx scripts/smoke-deep.ts && tsx scripts/smoke-quality.ts && tsx scripts/smoke-engine.ts && tsx scripts/smoke-jobs.ts && tsx scripts/smoke-agent.ts",
-    "test:duck": "tsx scripts/smoke-duck.ts"
+    "test:duck": "tsx scripts/smoke-duck.ts",
+    "test:live": "tsx scripts/verify-live.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",

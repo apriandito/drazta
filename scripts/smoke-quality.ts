@@ -248,6 +248,36 @@ function testQualityGate() {
   assert.equal(thin.escalate, true);
   ok("thin content rejected and marked for escalation");
 
+  // A genuinely short page is not a broken one. example.com is ~180 chars of
+  // real content; escalating it would launch a browser to re-fetch a page we
+  // already scraped correctly, then hand it back flagged `degraded`.
+  const shortButReal = evaluateDocument({
+    markdown: "Example Domain. This domain is for use in illustrative examples.",
+    html: "<html><head><title>Example Domain</title></head><body><h1>Example Domain</h1></body></html>",
+    metadata: { url: "https://example.com", title: "Example Domain" },
+  });
+  assert.equal(shortButReal.ok, true, "a short but complete page was rejected");
+  ok("short-but-complete pages are accepted, not escalated");
+
+  // The same length, but the page is still an unrendered app shell.
+  const shell = evaluateDocument({
+    markdown: "Loading…",
+    html: '<html><head><title>My App</title></head><body><div id="__next"></div></body></html>',
+    metadata: { url: "https://app.test", title: "My App" },
+  });
+  assert.equal(shell.ok, false);
+  assert.equal(shell.escalate, true);
+  ok("a titled page that is still an app shell is still escalated");
+
+  // Short AND no title — nothing suggests a real page rendered.
+  const untitled = evaluateDocument({
+    markdown: "404",
+    html: "<html><body>404</body></html>",
+    metadata: { url: "https://x.test" },
+  });
+  assert.equal(untitled.ok, false);
+  ok("short content with no title is still rejected");
+
   const wall = evaluateDocument({
     markdown: "Just a moment... " + "checking your browser ".repeat(20),
     metadata: { url: "u" },

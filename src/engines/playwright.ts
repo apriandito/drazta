@@ -62,6 +62,29 @@ async function getBrowser(): Promise<unknown> {
   return browserPromise;
 }
 
+/**
+ * Shuts the shared browser down.
+ *
+ * The browser is a module-level singleton so repeated scrapes reuse one launch
+ * instead of paying for a new one each time — but a live Chromium child process
+ * keeps Node's event loop alive, so a program that scraped one JS page would
+ * never exit on its own. A library must not hold its host process hostage, so
+ * the lifetime is explicit: call this when you are done scraping.
+ *
+ * Safe to call when no browser was ever launched, and safe to call twice.
+ */
+export async function closeBrowser(): Promise<void> {
+  const pending = browserPromise;
+  if (!pending) return;
+  browserPromise = null; // a later scrape may launch a fresh one
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (await pending as any).close();
+  } catch {
+    // Already gone, or never came up. Either way there is nothing to close.
+  }
+}
+
 let playwrightAvailable: boolean | null = null;
 async function isPlaywrightInstalled(): Promise<boolean> {
   if (playwrightAvailable !== null) return playwrightAvailable;

@@ -5,7 +5,16 @@ import {
 } from "../core/ports.js";
 import type { ScrapeOptions } from "../types.js";
 import { fetchEngine } from "./fetch.js";
-import { playwrightEngine } from "./playwright.js";
+import { closeBrowser, playwrightEngine } from "./playwright.js";
+
+/**
+ * Releases every resource the engines hold — today that is the shared browser.
+ * Call it before a short-lived program exits; without it, a process that
+ * scraped a JS-rendered page stays alive holding an idle Chromium.
+ */
+export async function shutdownEngines(): Promise<void> {
+  await closeBrowser();
+}
 
 /**
  * The engine registry. To add an engine (pdf, wikipedia, an external browser

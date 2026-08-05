@@ -1,5 +1,12 @@
 node_modules/
 dist/
+
+# Nuxt console (ui/)
+.nuxt/
+.output/
+.nitro/
+.cache/
+.data/
 *.log
 .env
 .DS_Store

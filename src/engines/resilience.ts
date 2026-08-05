@@ -218,8 +218,21 @@ export function evaluateDocument(doc: Document, minChars = 200): Verdict {
   if (length === 0) {
     return { ok: false, reason: "no-text", escalate: true };
   }
+
   if (length < minChars) {
-    return { ok: false, reason: `thin-content(${length})`, escalate: true };
+    // Short is not the same as broken. Plenty of real pages are genuinely
+    // brief, and escalating them costs a browser launch to re-fetch content we
+    // already have correctly — so shortness alone is not enough to reject.
+    // Only reject when the page ALSO looks unrendered: a client-side app root
+    // still waiting for its framework, or no <title> at all.
+    const html = doc.html ?? doc.rawHtml ?? "";
+    const appShell = /<div[^>]+id=["'](?:root|app|__next|__nuxt)["']/i.test(html);
+    const title =
+      typeof doc.metadata.title === "string" ? doc.metadata.title.trim() : "";
+
+    if (appShell || title.length === 0) {
+      return { ok: false, reason: `thin-content(${length})`, escalate: true };
+    }
   }
 
   return { ok: true };

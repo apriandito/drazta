@@ -124,6 +124,7 @@ export {
   engines,
   buildFallbackList,
   requiredFeatures,
+  shutdownEngines,
 } from "./engines/registry.js";
 export type { EngineChoice } from "./engines/registry.js";
 export { FEATURE_PRIORITY } from "./core/ports.js";

@@ -2,6 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import { scrapeUrl } from "./core/scrape.js";
 import { getSink } from "./export/registry.js";
+import { shutdownEngines } from "./engines/registry.js";
 import type { OutputFormat, ScrapeOptions } from "./types.js";
 
 /**
@@ -76,7 +77,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`[drazta] error: ${err?.message ?? err}`);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error(`[drazta] error: ${err?.message ?? err}`);
+    process.exitCode = 1;
+  })
+  // A scrape that used the browser leaves it running for reuse; a CLI run is
+  // over, so release it or the command never returns to the shell.
+  .finally(() => shutdownEngines());
