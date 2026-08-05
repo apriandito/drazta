@@ -124,6 +124,14 @@ fallback list is rebuilt around that fact instead of blindly advancing one
 slot. A `403` means *this needs stealth*; a JS-only shell means *this needs a
 browser*. Capped at three rounds, and partial results carry across them.
 
+**One budget for the whole call.** `timeoutMs` bounds the scrape end to end —
+every engine, every retry, every re-plan draws from the same clock, and each
+attempt gets what is *left* rather than a fresh allowance. The per-attempt
+reading is the trap: with four attempts against a black-holing host, a "60s
+timeout" silently becomes a four-minute hang with nothing bounding it. Default
+120s. Measured: a request that used to take 242s now returns in 20s when asked
+for 20s.
+
 **An error taxonomy where every error answers one question: `fatal`.** Dead
 DNS, refused connection and TLS failure stop the waterfall — no browser launch,
 no three retries — while a wall or a thin page escalates. Collapsing failures
@@ -430,7 +438,7 @@ summaries, so page content never floods the model context.
 ## Tests
 
 ```bash
-npm test              # 131 checks across 13 files — no API key, no network
+npm test              # 134 checks across 13 files — no API key, no network
 npm run test:live     # 16 checks against the real web (news, Wikipedia, stores)
 npm run test:camoufox # 8 checks: stealth install, update throttle, fingerprint
 npm run test:duck   # requires the optional @duckdb/node-api dep

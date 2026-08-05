@@ -326,8 +326,70 @@ async function testSSRFGuard() {
   ok("scrapeUrl inherits the guard through its fetch engine");
 }
 
+async function testDeadline() {
+  console.log("deadline:");
+
+  // A hung engine must not hold the call open. Before this, timeoutMs was a
+  // per-attempt allowance, so a black-holing host turned "60s" into 4 minutes.
+  const hang = fakeEngine(
+    "hang",
+    () => new Promise<RawResult>(() => {}), // never settles
+    { quality: 100, mrt: 500 },
+  );
+  const alsoHangs = fakeEngine("hang2", () => new Promise<RawResult>(() => {}), {
+    strong: true,
+    quality: 50,
+    mrt: 500,
+  });
+
+  const t0 = Date.now();
+  await assert.rejects(
+    withEngines([hang, alsoHangs], () =>
+      scrapeUrl("https://x.test/", { formats: ["markdown"], timeoutMs: 2000 }),
+    ),
+    (e: unknown) => e instanceof TimeoutError,
+  );
+  const ms = Date.now() - t0;
+  assert.ok(ms < 4000, `waited ${ms}ms for a 2000ms budget`);
+  ok(`two hung engines are abandoned at the budget (${ms}ms for 2000ms)`);
+
+  // Retries must fit inside the budget rather than multiply it.
+  let attempts = 0;
+  const flaky = fakeEngine(
+    "flaky",
+    async () => {
+      attempts++;
+      await sleep(400);
+      throw new Error("boom");
+    },
+    { quality: 100, mrt: 300 },
+  );
+  const t1 = Date.now();
+  await assert.rejects(
+    withEngines([flaky], () =>
+      scrapeUrl("https://x.test/", { formats: ["markdown"], timeoutMs: 1200 }),
+    ),
+  );
+  const ms1 = Date.now() - t1;
+  assert.ok(ms1 < 3000, `retries overran the budget: ${ms1}ms for 1200ms`);
+  ok(`retries stop when the budget is gone (${attempts} attempts, ${ms1}ms for 1200ms)`);
+
+  // A fast engine is unaffected — the budget is a ceiling, not a delay.
+  const quick = fakeEngine("quick", async () => ({ rawHtml: RICH, statusCode: 200 }), {
+    quality: 100,
+  });
+  const t2 = Date.now();
+  const doc = await withEngines([quick], () =>
+    scrapeUrl("https://x.test/", { formats: ["markdown"], timeoutMs: 30000 }),
+  );
+  assert.equal(doc.metadata.engine, "quick");
+  assert.ok(Date.now() - t2 < 1000, "a fast scrape should not wait for the budget");
+  ok("a generous budget does not slow a fast scrape down");
+}
+
 async function main() {
   testRouting();
+  await testDeadline();
   await testHedging();
   await testReplanning();
   await testErrorTaxonomy();

@@ -16,7 +16,12 @@ export interface ScrapeOptions {
   formats?: OutputFormat[];
   /** Strip nav/aside/footer/scripts and keep the main content only. */
   onlyMainContent?: boolean;
-  /** Per-request timeout in milliseconds. */
+  /**
+   * Total budget for the whole scrape, in milliseconds — every engine, every
+   * retry and every re-plan draws from it. NOT a per-attempt allowance: pass
+   * 60000 and the call returns within roughly 60s, rather than 60s multiplied
+   * by however many attempts the waterfall happened to make. Default 120000.
+   */
   timeoutMs?: number;
   /** Force a specific engine by name instead of the fallback list. */
   engine?: string;
