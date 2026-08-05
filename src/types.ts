@@ -27,6 +27,13 @@ export interface ScrapeOptions {
   /** Wait this long for late-rendering content before reading the DOM. */
   waitForMs?: number;
   /**
+   * Run browser engines with a visible window. Defaults to true (headless);
+   * set false to watch a scrape happen, which is the fastest way to see why a
+   * page is not yielding what you expected. Env: DRAZTA_HEADLESS=0.
+   * Ignored by the plain `fetch` engine, which has no window.
+   */
+  headless?: boolean;
+  /**
    * Capabilities this request requires, beyond what the other options imply.
    * Engines are ranked by how well they cover them. See core/ports.ts.
    */

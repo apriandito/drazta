@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import type { FetchEngine } from "../core/ports.js";
 import type { RawResult, ScrapeOptions } from "../types.js";
+import { resolveHeadless } from "./headless.js";
 
 /**
  * Browser engine for JS-heavy pages. Playwright is an OPTIONAL dependency and
@@ -43,16 +44,24 @@ function resolveExecutablePath(): string | undefined {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let browserPromise: Promise<any> | null = null;
+/** Mode the cached browser was launched with. A headful request cannot be
+ * served by a headless browser that is already running, so a mode change
+ * tears the old one down instead of silently ignoring the option. */
+let browserHeadless: boolean | null = null;
 
-async function getBrowser(): Promise<unknown> {
+async function getBrowser(headless: boolean): Promise<unknown> {
+  if (browserPromise && browserHeadless !== headless) {
+    await closeBrowser();
+  }
   if (!browserPromise) {
+    browserHeadless = headless;
     browserPromise = (async () => {
       const { chromium } = await import("playwright");
       // Chromium doesn't honor HTTP(S)_PROXY env vars automatically; pass it
       // explicitly so it works behind a corporate/agent proxy like fetch does.
       const proxyServer = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
       return chromium.launch({
-        headless: true,
+        headless,
         executablePath: resolveExecutablePath(),
         args: LAUNCH_ARGS,
         proxy: proxyServer ? { server: proxyServer } : undefined,
@@ -77,6 +86,7 @@ export async function closeBrowser(): Promise<void> {
   const pending = browserPromise;
   if (!pending) return;
   browserPromise = null; // a later scrape may launch a fresh one
+  browserHeadless = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (await pending as any).close();
@@ -132,7 +142,7 @@ export const playwrightEngine: FetchEngine = {
     }
     signal?.throwIfAborted();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browser = (await getBrowser()) as any;
+    const browser = (await getBrowser(resolveHeadless(opts))) as any;
     const context = await browser.newContext({
       userAgent: opts.headers?.["user-agent"] ?? UA,
       viewport: { width: 1366, height: 768 },

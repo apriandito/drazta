@@ -430,7 +430,7 @@ summaries, so page content never floods the model context.
 ## Tests
 
 ```bash
-npm test              # 128 checks across 13 files — no API key, no network
+npm test              # 131 checks across 13 files — no API key, no network
 npm run test:live     # 16 checks against the real web (news, Wikipedia, stores)
 npm run test:camoufox # 8 checks: stealth install, update throttle, fingerprint
 npm run test:duck   # requires the optional @duckdb/node-api dep

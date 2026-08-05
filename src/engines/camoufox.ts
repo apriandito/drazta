@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { FetchEngine } from "../core/ports.js";
 import type { RawResult, ScrapeOptions } from "../types.js";
+import { resolveHeadless } from "./headless.js";
 
 /**
  * Camoufox — a real stealth engine.
@@ -236,10 +237,17 @@ export async function webglSamplingWorks(): Promise<boolean> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let browserPromise: Promise<any> | null = null;
+/** See playwright.ts: a cached headless browser cannot serve a headful request. */
+let browserHeadless: boolean | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getBrowser(opts: ScrapeOptions, log: (m: string) => void): Promise<any> {
+  const headless = resolveHeadless(opts);
+  if (browserPromise && browserHeadless !== headless) {
+    await closeCamoufox();
+  }
   if (!browserPromise) {
+    browserHeadless = headless;
     browserPromise = (async () => {
       const camoufox = await loadCamoufox();
       if (!camoufox) throw new Error("camoufox-js is not installed");
@@ -259,7 +267,7 @@ async function getBrowser(opts: ScrapeOptions, log: (m: string) => void): Promis
 
       return firefox.launch({
         ...(await camoufox.launchOptions({
-          headless: true,
+          headless,
           // Only when sampling is impossible: blocking WebGL is itself a small
           // signal, so it is never the default.
           ...(webglOk ? {} : { block_webgl: true, i_know_what_im_doing: true }),
@@ -285,6 +293,7 @@ export async function closeCamoufox(): Promise<void> {
   const pending = browserPromise;
   if (!pending) return;
   browserPromise = null;
+  browserHeadless = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await ((await pending) as any).close();

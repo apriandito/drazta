@@ -5,6 +5,7 @@ import { buildFallbackList, engines } from "../src/engines/registry.js";
 import { camoufoxEngine } from "../src/engines/camoufox.js";
 import { playwrightEngine } from "../src/engines/playwright.js";
 import { fetchEngine } from "../src/engines/fetch.js";
+import { resolveHeadless } from "../src/engines/headless.js";
 
 let passed = 0;
 const ok = (n: string) => (passed++, console.log(`  ✓ ${n}`));
@@ -86,8 +87,31 @@ function testShape() {
   ok("an explicit timeout wins over the default");
 }
 
+function testHeadless() {
+  console.log("headless option:");
+  assert.equal(resolveHeadless({}), true);
+  ok("headless by default");
+
+  assert.equal(resolveHeadless({ headless: false }), false);
+  ok("headless:false opens a visible window");
+
+  const prev = process.env.DRAZTA_HEADLESS;
+  try {
+    process.env.DRAZTA_HEADLESS = "0";
+    assert.equal(resolveHeadless({}), false, "env should switch the default");
+    // A per-request value must still win, or a debugging env var would
+    // silently change behaviour for callers that asked for headless.
+    assert.equal(resolveHeadless({ headless: true }), true);
+  } finally {
+    if (prev === undefined) delete process.env.DRAZTA_HEADLESS;
+    else process.env.DRAZTA_HEADLESS = prev;
+  }
+  ok("DRAZTA_HEADLESS=0 flips the default, per-request still wins");
+}
+
 function main() {
   testRegistered();
+  testHeadless();
   testOrdering();
   testExplicitChoice();
   testShape();

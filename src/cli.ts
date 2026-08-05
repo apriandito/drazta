@@ -8,7 +8,8 @@ import type { OutputFormat, ScrapeOptions } from "./types.js";
 /**
  * Minimal CLI:
  *   drazta <url> [--format markdown|json|rawHtml|links|html]
- *                     [--main] [--js] [--engine fetch|playwright]
+ *                     [--main] [--js] [--stealth] [--show] [--wait ms]
+ *                     [--engine fetch|playwright|camoufox]
  *                     [--out file] [--export markdown|json|xlsx]
  */
 function parseArgs(argv: string[]) {
@@ -23,6 +24,11 @@ function parseArgs(argv: string[]) {
     else if (a === "--main") opts.onlyMainContent = true;
     else if (a === "--js") opts.requiresJs = true;
     else if (a === "--engine") opts.engine = rest[++i];
+    else if (a === "--stealth") opts.features = [...(opts.features ?? []), "stealth"];
+    // Watching a scrape is the fastest way to see why a page is not yielding
+    // what you expected, so it gets a flag rather than an env var.
+    else if (a === "--show" || a === "--headful") opts.headless = false;
+    else if (a === "--wait") opts.waitForMs = Number(rest[++i]);
     else if (a === "--out") out = rest[++i];
     else if (a === "--export") exportFormat = rest[++i];
   }
@@ -33,7 +39,9 @@ async function main() {
   const { url, opts, out, exportFormat } = parseArgs(process.argv.slice(2));
   if (!url) {
     console.error(
-      "usage: drazta <url> [--format markdown|json|rawHtml|links|html] [--main] [--js] [--engine name] [--export markdown|json|xlsx] [--out file]",
+      "usage: drazta <url> [--format markdown|json|rawHtml|links|html] [--main]\n" +
+        "                    [--js] [--stealth] [--engine fetch|playwright|camoufox]\n" +
+        "                    [--show] [--wait ms] [--export markdown|json|xlsx] [--out file]",
     );
     process.exit(1);
   }
