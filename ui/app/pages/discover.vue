@@ -28,6 +28,31 @@ const crawled = useRun<{
   degradedCount: number;
 }>("/api/crawl");
 
+const mapFigures = computed(() => {
+  const d = map.data.value;
+  if (!d) return [];
+  return [
+    { value: d.total.toLocaleString("en-US"), label: "URLs found" },
+    { value: d.fromSitemap.toLocaleString("en-US"), label: "from sitemap" },
+    { value: d.fromLinks.toLocaleString("en-US"), label: "from links" },
+    d.ms >= 1000
+      ? { value: (d.ms / 1000).toFixed(1), label: "seconds" }
+      : { value: String(d.ms), label: "milliseconds" },
+  ];
+});
+
+const crawlFigures = computed(() => {
+  const d = crawled.data.value;
+  if (!d) return [];
+  return [
+    { value: d.pages.length.toLocaleString("en-US"), label: "pages scraped" },
+    { value: d.errors.length.toLocaleString("en-US"), label: "did not make it" },
+    d.ms >= 1000
+      ? { value: (d.ms / 1000).toFixed(1), label: "seconds" }
+      : { value: String(d.ms), label: "milliseconds" },
+  ];
+});
+
 function saveUrls() {
   const list = map.data.value?.entries ?? [];
   downloadText(
@@ -108,31 +133,38 @@ function saveUrls() {
         </form>
       </DzPanel>
 
+      <div v-if="!map.data.value && !map.failure.value && !map.pending.value" class="mt-10">
+        <DzEmpty
+          label="Where the URLs come from"
+          :rows="[
+            {
+              term: 'robots.txt',
+              says: 'Read for Sitemap: directives — the site pointing at its own index.',
+            },
+            {
+              term: 'sitemap.xml',
+              says: 'Parsed directly, following one level of sitemap index. These entries are site-declared.',
+            },
+            {
+              term: 'homepage links',
+              says: 'The fallback when there is no sitemap. Harvested by us, so they carry a different stamp.',
+            },
+            {
+              term: 'dedup',
+              says: 'By canonical key: www, :443, index.html and ?utm_* variants collapse to one, while ?page=2 stays distinct.',
+            },
+          ]"
+        />
+      </div>
+
       <div v-if="map.failure.value" class="mt-10">
         <DzPanel label="Failed"><DzFailure :failure="map.failure.value" /></DzPanel>
       </div>
 
       <div v-if="map.data.value" class="mt-10 flex flex-col gap-10">
         <DzPanel label="Receipt">
-          <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 font-mono text-xs">
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">found</dt>
-              <dd class="text-ink">{{ map.data.value.total.toLocaleString("en-US") }} URLs</dd>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">took</dt>
-              <dd class="text-ink">{{ map.data.value.ms }} ms</dd>
-            </div>
-            <div class="flex items-center gap-2">
-              <DzStamp source="sitemap" />
-              <dd class="text-ink">{{ map.data.value.fromSitemap.toLocaleString("en-US") }}</dd>
-            </div>
-            <div class="flex items-center gap-2">
-              <DzStamp source="links" />
-              <dd class="text-ink">{{ map.data.value.fromLinks.toLocaleString("en-US") }}</dd>
-            </div>
-          </dl>
-          <p class="mt-2.5 text-[13px] leading-relaxed text-ink-2">
+          <DzFigures :figures="mapFigures" />
+          <p class="mt-5 text-[13px] leading-relaxed text-ink-2">
             Sitemap entries are what the site declares about itself. Link entries were harvested
             from the homepage — the same page, read by us.
           </p>
@@ -225,24 +257,17 @@ function saveUrls() {
 
       <div v-if="crawled.data.value" class="mt-10 flex flex-col gap-10">
         <DzPanel label="Receipt">
-          <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 font-mono text-xs">
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">scraped</dt>
-              <dd class="text-ink">{{ crawled.data.value.pages.length }} pages</dd>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">took</dt>
-              <dd class="text-ink">{{ crawled.data.value.ms }} ms</dd>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">failed</dt>
-              <dd class="text-ink">{{ crawled.data.value.errors.length }}</dd>
-            </div>
-            <div v-if="crawled.data.value.degradedCount" class="flex items-center gap-2">
-              <DzStamp source="degraded" />
-              <dd class="text-ink">{{ crawled.data.value.degradedCount }} pages</dd>
-            </div>
-          </dl>
+          <DzFigures :figures="crawlFigures" />
+          <p
+            v-if="crawled.data.value.degradedCount"
+            class="mt-5 flex flex-wrap items-center gap-2.5 font-mono text-[11px] text-ink-2"
+          >
+            <DzStamp source="degraded" />
+            <span>
+              {{ crawled.data.value.degradedCount }} of these pages came back degraded — every
+              engine rejected them and the best partial result was kept.
+            </span>
+          </p>
         </DzPanel>
 
         <DzPanel

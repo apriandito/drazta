@@ -142,6 +142,31 @@
     letter-spacing: -0.02em;
   }
 
+  /*
+    The missing middle of the type scale. Measurements are the point of this
+    console, so numbers get a tier of their own — large, tabular, mono — rather
+    than living at caption size like everything else.
+  */
+  .readout-figure {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.125rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  /* The ordinal in a sequence — the fallback order is a real sequence. */
+  .ordinal {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.75rem;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Text entry. Ink-on-surface, one hairline, no rounding — an instrument. */
   .input {
     width: 100%;
@@ -166,6 +191,14 @@
     border-color: var(--ink);
   }
 
+  /*
+    Results arrive rather than blink into place. One short move, used only
+    where content appears after a request — nowhere else.
+  */
+  .appear {
+    animation: appear 260ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
   /* Markdown / raw output surfaces. */
   .readout {
     font-family: var(--font-mono);
@@ -173,6 +206,17 @@
     line-height: 1.7;
     white-space: pre-wrap;
     word-break: break-word;
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 

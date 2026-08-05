@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ScrapedDocument } from "~/types/api";
+import type { RoutingPlan, ScrapedDocument } from "~/types/api";
 
 useHead({ title: "Scrape · Drazta" });
 
@@ -21,6 +21,16 @@ const { data: engineInfo } = await useFetch<{
 const browserEngine = computed(() =>
   engineInfo.value?.engines.find((e) => e.optional && !e.installed),
 );
+
+/**
+ * The routing plan is recomputed by the library, not guessed here, so toggling
+ * an option visibly re-plans the waterfall before anything is fetched.
+ */
+const { data: plan, refresh: replan } = await useFetch<RoutingPlan & { ok: boolean }>("/api/plan", {
+  method: "POST",
+  body: computed(() => ({ requiresJs: form.requiresJs })),
+});
+watch(() => form.requiresJs, () => replan());
 
 function toggleFormat(format: string) {
   const at = form.formats.indexOf(format);
@@ -115,13 +125,22 @@ const headline = computed(() => {
       </form>
     </DzPanel>
 
-    <div v-if="failure" class="mt-10">
+    <DzPanel
+      v-if="plan?.ok"
+      label="Routing plan"
+      :meta="data ? 'as it ran' : 'before it runs'"
+      class="mt-12"
+    >
+      <DzWaterfall :plan="plan" :winner="meta?.engine ?? null" />
+    </DzPanel>
+
+    <div v-if="failure" class="mt-12">
       <DzPanel label="Failed">
         <DzFailure :failure="failure" />
       </DzPanel>
     </div>
 
-    <div v-if="data" class="mt-10 flex flex-col gap-10">
+    <div v-if="data" class="appear mt-12 flex flex-col gap-12">
       <DzPanel label="Receipt">
         <DzReceipt :metadata="meta" :ms="data.ms" />
       </DzPanel>

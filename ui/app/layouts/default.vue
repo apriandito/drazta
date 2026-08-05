@@ -15,7 +15,10 @@ const NAV = [
 </script>
 
 <template>
-  <div class="min-h-dvh bg-ground lg:flex">
+  <!-- On wide screens the page ground is the rail's surface, and `main` paints
+       the reading area over it — so a sticky rail never leaves a gap below
+       itself on a long page. -->
+  <div class="min-h-dvh bg-ground lg:flex lg:bg-surface">
     <a
       href="#main"
       class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-ink focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:text-surface"
@@ -80,7 +83,7 @@ const NAV = [
       </div>
     </header>
 
-    <main id="main" class="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
+    <main id="main" class="min-w-0 flex-1 bg-ground px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
       <div class="mx-auto max-w-5xl">
         <slot />
       </div>

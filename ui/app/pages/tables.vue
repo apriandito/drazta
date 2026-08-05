@@ -64,6 +64,25 @@ async function runDeep() {
 
 const failed = computed(() => deep.data.value?.sources.filter((s) => s.error) ?? []);
 
+const deepFigures = computed(() => {
+  const d = deep.data.value;
+  if (!d) return [];
+  const out = [
+    { value: d.table.rowCount.toLocaleString("en-US"), label: "rows out" },
+    { value: `${d.sources.length - failed.value.length}/${d.sources.length}`, label: "pages with a table" },
+  ];
+  // Only a join has keys to match, and that count is the whole point of one.
+  if (d.matchedKeys !== null) {
+    out.push({ value: d.matchedKeys.toLocaleString("en-US"), label: "keys in 2+ sources" });
+  }
+  out.push(
+    d.ms >= 1000
+      ? { value: (d.ms / 1000).toFixed(1), label: "seconds" }
+      : { value: String(d.ms), label: "milliseconds" },
+  );
+  return out;
+});
+
 /* ---- export ------------------------------------------------------------ */
 
 function saveCsv(preview: { columns: TidyPreview["columns"]; rows: TidyPreview["rows"] }, url: string) {
@@ -129,6 +148,30 @@ function saveCsv(preview: { columns: TidyPreview["columns"]; rows: TidyPreview["
           </div>
         </form>
       </DzPanel>
+
+      <div v-if="!one.data.value && !one.failure.value && !one.pending.value" class="mt-10">
+        <DzEmpty
+          label="What tidying does"
+          :rows="[
+            {
+              term: 'column types',
+              says: 'Each column is classified from its own cells — number, percent, date, or text — and shown in the header.',
+            },
+            {
+              term: 'numbers',
+              says: '“1.250” becomes 1250 and “4.8” stays 4.8. Indonesian and US formats are disambiguated, not guessed at once and applied everywhere.',
+            },
+            {
+              term: 'footnotes',
+              says: 'Markers like [4] are stripped from cells before the type is inferred.',
+            },
+            {
+              term: 'blanks',
+              says: 'Empty cells become null rather than an empty string, so they survive into SQL as missing data.',
+            },
+          ]"
+        />
+      </div>
 
       <div v-if="one.failure.value" class="mt-10">
         <DzPanel label="Failed"><DzFailure :failure="one.failure.value" /></DzPanel>
@@ -295,31 +338,9 @@ function saveCsv(preview: { columns: TidyPreview["columns"]; rows: TidyPreview["
 
       <div v-if="deep.data.value" class="mt-10 flex flex-col gap-10">
         <DzPanel label="Receipt">
-          <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 font-mono text-xs">
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">merge</dt>
-              <dd class="text-ink">{{ deep.data.value.merge }}</dd>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">took</dt>
-              <dd class="text-ink">{{ deep.data.value.ms }} ms</dd>
-            </div>
-            <div class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">pages</dt>
-              <dd class="text-ink">
-                {{ deep.data.value.sources.length - failed.length }}/{{
-                  deep.data.value.sources.length
-                }}
-                yielded a table
-              </dd>
-            </div>
-            <div v-if="deep.data.value.matchedKeys !== null" class="flex items-baseline gap-1.5">
-              <dt class="text-ink-3">matched keys</dt>
-              <dd class="text-ink">{{ deep.data.value.matchedKeys.toLocaleString("en-US") }}</dd>
-            </div>
-          </dl>
+          <DzFigures :figures="deepFigures" />
 
-          <ul v-if="failed.length" class="mt-3 flex flex-col gap-1.5">
+          <ul v-if="failed.length" class="mt-5 flex flex-col gap-1.5">
             <li
               v-for="src in failed"
               :key="src.url"

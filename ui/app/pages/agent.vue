@@ -133,20 +133,13 @@ const columns = computed(() => {
 
     <div v-if="data" class="mt-10 flex flex-col gap-10">
       <DzPanel label="Receipt">
-        <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 font-mono text-xs">
-          <div class="flex items-baseline gap-1.5">
-            <dt class="text-ink-3">records</dt>
-            <dd class="text-ink">{{ data.recordCount.toLocaleString("en-US") }}</dd>
-          </div>
-          <div class="flex items-baseline gap-1.5">
-            <dt class="text-ink-3">files</dt>
-            <dd class="text-ink">{{ data.files.length }}</dd>
-          </div>
-          <div class="flex items-baseline gap-1.5">
-            <dt class="text-ink-3">took</dt>
-            <dd class="text-ink">{{ (data.ms / 1000).toFixed(1) }} s</dd>
-          </div>
-        </dl>
+        <DzFigures
+          :figures="[
+            { value: data.recordCount.toLocaleString('en-US'), label: 'records' },
+            { value: String(data.files.length), label: 'files' },
+            { value: (data.ms / 1000).toFixed(1), label: 'seconds' },
+          ]"
+        />
       </DzPanel>
 
       <DzPanel v-if="data.files.length" label="Files">

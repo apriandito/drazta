@@ -83,6 +83,10 @@ const OMIT = ["body", "description"];
       </form>
     </DzPanel>
 
+    <div v-if="!data && !failure && !pending" class="mt-10">
+      <DzLegend />
+    </div>
+
     <div v-if="failure" class="mt-10">
       <DzPanel label="Failed">
         <DzFailure :failure="failure" />

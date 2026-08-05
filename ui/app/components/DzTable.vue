@@ -29,9 +29,11 @@ function cell(value: string | number | null): string {
 </script>
 
 <template>
-  <div class="overflow-x-auto border border-rule-soft bg-surface">
+  <!-- Bounded height with a pinned header: 200 rows of real data should scroll
+       inside the panel, not turn the page into a mile of scrolling. -->
+  <div class="max-h-[36rem] overflow-auto border border-rule-soft bg-surface">
     <table class="w-full border-collapse font-mono text-xs">
-      <thead>
+      <thead class="sticky top-0 z-10 bg-surface">
         <tr class="border-b border-rule">
           <th
             v-for="col in columns"

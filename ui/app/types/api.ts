@@ -89,6 +89,32 @@ export interface TablePreview extends TidyPreview {
   colCount: number;
 }
 
+export type FeatureFlag =
+  | "javascript"
+  | "stealth"
+  | "screenshot"
+  | "waitFor"
+  | "cookies"
+  | "location";
+
+export interface RoutingPlan {
+  /** Capabilities the current options imply. Empty means "order by quality". */
+  required: FeatureFlag[];
+  /** Total priority demanded; each engine's supportScore is measured against it. */
+  demand: number;
+  threshold: number;
+  forced: boolean;
+  plan: {
+    position: number;
+    name: string;
+    quality: number;
+    supportScore: number;
+    unsupported: FeatureFlag[];
+    covers: FeatureFlag[];
+  }[];
+  dropped: { name: string; quality: number; lacks: FeatureFlag[] }[];
+}
+
 export interface MapEntry {
   url: string;
   source: "sitemap" | "links";
